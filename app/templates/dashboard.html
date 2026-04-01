@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
+    <title>Quorra SIEM - Security Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/chart.js" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .attack-critical { border-left: 4px solid #dc3545; }
+        .attack-high { border-left: 4px solid #fd7e14; }
+        .attack-medium { border-left: 4px solid #ffc107; }
+        .attack-low { border-left: 4px solid #0dcaf0; }
+        .attack-info { border-left: 4px solid #6c757d; }
+        
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .live-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+        
+        .nav-link:hover {
+            color: #fff !important;
+        }
+        
+        .severity-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        
+        .severity-critical { background: #dc3545; }
+        .severity-high { background: #fd7e14; }
+        .severity-medium { background: #ffc107; color: #000; }
+        .severity-low { background: #0dcaf0; }
+        .severity-info { background: #6c757d; }
+        
+        .log-entry {
+            border-left: 3px solid transparent;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+        
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>
+                <span class="fw-bold">QUORRA SIEM</span>
+                <span class="badge bg-primary ms-2">v1.0</span>
+                <span class="badge bg-success ms-2 live-badge">LIVE</span>
+            </a>
+            
+            <div class="navbar-nav flex-row align-items-center">
+                <span class="text-light me-3">
+                    <i class="fas fa-user-circle me-1"></i>
+                    {{ username }}
+                </span>
+                <a class="nav-link mx-3 active" href="/dashboard">
+                    <i class="fas fa-chart-line me-1"></i> Dashboard
+                </a>
+                <a class="nav-link mx-3" href="/logs">
+                    <i class="fas fa-list me-1"></i> Logs
+                </a>
+                <a class="nav-link mx-3" href="/attacks">
+                    <i class="fas fa-bug me-1"></i> Attacks
+                </a>
+                <a class="nav-link mx-3" href="/alerts">
+                    <i class="fas fa-bell me-1"></i> Alerts
+                </a>
+                <a class="nav-link mx-3" href="/blocklist">
+                    <i class="fas fa-ban me-1"></i> Blocklist
+                </a>
+                <a class="nav-link mx-3 text-warning" href="/login">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-tachometer-alt me-2"></i>Security Dashboard
+                </h1>
+                <p class="text-muted mb-0">Real-time security monitoring for Block Fortress</p>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="dashboard-card stat-card">
+                    <div class="stat-number text-primary" id="totalAttacks">0</div>
+                    <div class="stat-label">Total Attacks</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="dashboard-card stat-card">
+                    <div class="stat-number text-warning" id="todayAttacks">0</div>
+                    <div class="stat-label">Today's Attacks</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="dashboard-card stat-card">
+                    <div class="stat-number text-danger" id="blockedIPs">0</div>
+                    <div class="stat-label">Blocked IPs</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="dashboard-card stat-card">
+                    <div class="stat-number text-success" id="activeAlerts">0</div>
+                    <div class="stat-label">Active Alerts</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col-lg-8">
+                <!-- Attack Chart -->
+                <div class="dashboard-card p-4 mb-4">
+                    <h5 class="mb-3">
+                        <i class="fas fa-chart-bar me-2"></i>Attack Timeline (Last 24 Hours)
+                    </h5>
+                    <canvas id="attackTimelineChart" height="150"></canvas>
+                </div>
+                
+                <!-- Recent Attacks -->
+                <div class="dashboard-card p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bolt me-2"></i>Recent Attacks
+                        </h5>
+                        <a href="/attacks" class="btn btn-sm btn-outline-light">View All</a>
+                    </div>
+                    <div id="recentAttacks">
+                        {% if recent_attacks %}
+                            {% for attack in recent_attacks %}
+                            <div class="attack-{{ attack.severity }} p-3 mb-2 rounded">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ attack.attack_type }}</strong>
+                                        <span class="severity-badge severity-{{ attack.severity }} ms-2">{{ attack.severity }}</span>
+                                    </div>
+                                    <small>{{ attack.detected_at.strftime('%H:%M:%S') }}</small>
+                                </div>
+                                <div class="small mt-1">
+                                    <i class="fas fa-globe me-1"></i> {{ attack.ip_address }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-3">No recent attacks</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Recent Logs -->
+                <div class="dashboard-card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Recent Security Logs
+                        </h5>
+                        <a href="/logs" class="btn btn-sm btn-outline-light">View All</a>
+                    </div>
+                    <div id="recentLogs">
+                        {% if logs %}
+                            {% for log in logs %}
+                            <div class="log-entry">
+                                <div class="d-flex justify-content-between">
+                                    <small><strong>{{ log.attack_type }}</strong></small>
+                                    <small>{{ log.timestamp.strftime('%H:%M:%S') }}</small>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small><code>{{ log.ip_address }}</code></small>
+                                    <span class="severity-badge severity-{{ log.severity }}">{{ log.severity }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-3">No recent logs</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column -->
+            <div class="col-lg-4">
+                <!-- System Status -->
+                <div class="dashboard-card p-4 mb-4">
+                    <h5 class="mb-3">
+                        <i class="fas fa-network-wired me-2"></i>System Status
+                    </h5>
+                    <div id="systemStatus">
+                        <div class="mb-2">
+                            <i class="fas fa-circle text-success me-2"></i>
+                            <span>Quorra SIEM</span>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-circle text-warning me-2"></i>
+                            <span>Connecting to Block Fortress...</span>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-circle text-success me-2"></i>
+                            <span>Database</span>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-circle text-success me-2"></i>
+                            <span>Rules Engine</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Active Alerts -->
+                <div class="dashboard-card p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Active Alerts
+                        </h5>
+                        <a href="/alerts" class="btn btn-sm btn-outline-light">View All</a>
+                    </div>
+                    <div id="activeAlertsList">
+                        {% if alerts %}
+                            {% for alert in alerts %}
+                                {% if not alert.read %}
+                                <div class="alert alert-{{ 'danger' if alert.severity == 'critical' else 'warning' }} mb-2">
+                                    <div class="small">{{ alert.created_at.strftime('%H:%M:%S') }}</div>
+                                    <div class="fw-bold">{{ alert.message }}</div>
+                                    <button class="btn btn-sm btn-outline-dark mt-2" onclick="acknowledgeAlert({{ alert.id }})">
+                                        Acknowledge
+                                    </button>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">No unread alerts</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="dashboard-card p-4">
+                    <h5 class="mb-3">
+                        <i class="fas fa-cogs me-2"></i>Quick Actions
+                    </h5>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-light" onclick="startMonitoring()" id="monitoringBtn">
+                            <i class="fas fa-play me-2"></i>Start Monitoring
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="stopMonitoring()">
+                            <i class="fas fa-stop me-2"></i>Stop Monitoring
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="exportLogs()">
+                            <i class="fas fa-download me-2"></i>Export Logs
+                        </button>
+                        <a href="/blocklist" class="btn btn-outline-info">
+                            <i class="fas fa-ban me-2"></i>Manage Blocklist
+                        </a>
+                    </div>
+=======
+    <title>Quorra SIEM - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg,#0d0d1a 0%,#111827 100%); color:#e5e7eb; min-height:100vh; font-family:'Segoe UI',sans-serif; }
+
+        /* Nav */
+        .navbar { background:#0a0a14 !important; border-bottom:1px solid rgba(99,102,241,.25); }
+        .nav-link { color:rgba(255,255,255,.65) !important; font-size:.85rem; }
+        .nav-link:hover,.nav-link.active { color:#a78bfa !important; }
+        .nav-link.active { border-bottom:2px solid #a78bfa; }
+
+        /* Cards */
+        .g-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:20px; margin-bottom:20px; }
+        .g-card:hover { border-color:rgba(99,102,241,.35); }
+
+        /* Stat tiles */
+        .stat-tile { text-align:center; padding:18px 10px; }
+        .stat-num  { font-size:2.2rem; font-weight:700; line-height:1; }
+        .stat-lbl  { font-size:.78rem; color:#9ca3af; margin-top:4px; text-transform:uppercase; letter-spacing:.06em; }
+
+        /* Risk score ring */
+        .risk-ring { width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; border:3px solid; }
+        .risk-critical { border-color:#ef4444; color:#ef4444; background:rgba(239,68,68,.1); }
+        .risk-high     { border-color:#f97316; color:#f97316; background:rgba(249,115,22,.1); }
+        .risk-medium   { border-color:#eab308; color:#eab308; background:rgba(234,179,8,.1); }
+        .risk-low      { border-color:#22c55e; color:#22c55e; background:rgba(34,197,94,.1); }
+        .risk-info     { border-color:#6b7280; color:#9ca3af; background:rgba(107,114,128,.1); }
+
+        /* Severity badges */
+        .sev { padding:2px 8px; border-radius:99px; font-size:.7rem; font-weight:600; display:inline-block; }
+        .sev-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+        .sev-high    {background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+        .sev-medium  {background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+        .sev-low     {background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+        .sev-info    {background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        /* ML tag pills */
+        .ml-tag { font-size:.65rem; padding:1px 6px; border-radius:99px; margin-right:3px; margin-top:2px; display:inline-block; }
+        .ml-anomaly  {background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);}
+        .ml-ueba     {background:rgba(168,85,247,.15);color:#d8b4fe;border:1px solid rgba(168,85,247,.3);}
+        .ml-lstm     {background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(59,130,246,.3);}
+        .ml-novel    {background:rgba(234,179,8,.15);color:#fde68a;border:1px solid rgba(234,179,8,.3);}
+        .ml-chain    {background:rgba(239,68,68,.25);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+        .ml-mitre    {background:rgba(99,102,241,.15);color:#c7d2fe;border:1px solid rgba(99,102,241,.3);}
+
+        /* Model dots */
+        .mdot { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px; }
+        .mdot-on{background:#22c55e;} .mdot-off{background:#4b5563;}
+
+        /* Progress bars */
+        .risk-bar { height:5px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; margin-top:6px; }
+        .risk-bar-fill { height:100%; border-radius:99px; transition:width .5s; }
+
+        /* Trend arrows */
+        .trend-up{color:#ef4444;} .trend-down{color:#22c55e;} .trend-stable{color:#9ca3af;}
+
+        .live-badge { animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .log-row { padding:10px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+        .log-row:last-child { border-bottom:none; }
+
+        /* Section heading */
+        .sec-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:#6b7280; margin-bottom:12px; font-weight:600; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM
+            <span class="badge ms-2" style="background:#1e1b4b;color:#a78bfa;font-size:.65rem">v2.0</span>
+            <span class="badge bg-success ms-1 live-badge" style="font-size:.65rem">LIVE</span>
+        </a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link active px-2" href="/dashboard"><i class="fas fa-chart-line me-1"></i>Dashboard</a>
+            <a class="nav-link px-2" href="/logs"><i class="fas fa-list me-1"></i>Logs</a>
+            <a class="nav-link px-2" href="/attacks"><i class="fas fa-bug me-1"></i>Attacks</a>
+            <a class="nav-link px-2" href="/alerts"><i class="fas fa-bell me-1"></i>Alerts</a>
+            <a class="nav-link px-2" href="/blocklist"><i class="fas fa-ban me-1"></i>Blocklist</a>
+            <a class="nav-link px-2" href="/rules"><i class="fas fa-sliders-h me-1"></i>Rules</a>
+            <a class="nav-link px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+    <!-- Row 1: Core stats -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="g-card stat-tile"><div class="stat-num text-primary" id="totalAttacks">—</div><div class="stat-lbl">Total Attacks</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card stat-tile"><div class="stat-num text-warning" id="todayAttacks">—</div><div class="stat-lbl">Today's Attacks</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card stat-tile"><div class="stat-num text-danger"  id="blockedIPs">—</div><div class="stat-lbl">Blocked IPs</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card stat-tile"><div class="stat-num" style="color:#a78bfa" id="mlEvents">—</div><div class="stat-lbl">ML Events Analyzed</div></div></div>
+    </div>
+
+    <!-- Row 2: ML model status strip -->
+    <div class="g-card py-3 px-4 mb-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="sec-head mb-0">ML Models</span>
+            <span id="mlStatusStrip" class="d-flex flex-wrap gap-3">
+                <span class="text-secondary" style="font-size:.8rem">Loading…</span>
+            </span>
+            <span class="ms-auto text-secondary" style="font-size:.75rem">UEBA profiles: <strong id="uebaCount" class="text-white">—</strong></span>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- LEFT: timeline + recent attacks/logs -->
+        <div class="col-lg-8">
+
+            <!-- Attack timeline chart -->
+            <div class="g-card mb-3">
+                <p class="sec-head">Attack Timeline — Last 24h</p>
+                <canvas id="attackTimelineChart" height="110"></canvas>
+            </div>
+
+            <!-- Recent attacks with ML scores -->
+            <div class="g-card mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="sec-head mb-0">Recent Attacks + ML Analysis</p>
+                    <a href="/attacks" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem">View All</a>
+                </div>
+                <div id="recentAttacks"><div class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</div></div>
+            </div>
+
+            <!-- Recent logs with ML risk -->
+            <div class="g-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="sec-head mb-0">Recent Logs — with ML Risk Score</p>
+                    <a href="/logs" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem">View All</a>
+                </div>
+                <div id="recentLogs"><div class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</div></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: ML panels -->
+        <div class="col-lg-4">
+
+            <!-- System + ML status -->
+            <div class="g-card mb-3">
+                <p class="sec-head">System Status</p>
+                <div id="systemStatus">
+                    <div class="mb-2 small"><span class="mdot mdot-on"></span>Quorra SIEM</div>
+                    <div class="mb-2 small"><span class="mdot mdot-off"></span>Connecting…</div>
+                    <div class="mb-2 small"><span class="mdot mdot-on"></span>Database</div>
+                    <div class="mb-2 small"><span class="mdot mdot-off"></span>ML Pipeline</div>
+                </div>
+            </div>
+
+            <!-- Top risky entities from ML/UEBA -->
+            <div class="g-card mb-3">
+                <p class="sec-head">Top Risky Entities (ML/UEBA)</p>
+                <div id="riskyEntities"><p class="text-secondary small">Loading…</p></div>
+            </div>
+
+            <!-- Active attack chains -->
+            <div class="g-card mb-3">
+                <p class="sec-head">Active Attack Chains</p>
+                <div id="attackChains"><p class="text-secondary small">Loading…</p></div>
+            </div>
+
+            <!-- Active alerts -->
+            <div class="g-card mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="sec-head mb-0">Active Alerts</p>
+                    <a href="/alerts" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem">All</a>
+                </div>
+                <div id="activeAlertsList"><p class="text-secondary small text-center">Loading…</p></div>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="g-card">
+                <p class="sec-head">Quick Actions</p>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="monitoringBtn" onclick="toggleMonitoring()"><i class="fas fa-play me-2"></i>Start Monitoring</button>
+                    <a class="btn btn-sm btn-outline-warning" href="/api/logs/export?format=json"><i class="fas fa-download me-2"></i>Export Logs</a>
+                    <a class="btn btn-sm btn-outline-danger" href="/blocklist"><i class="fas fa-ban me-2"></i>Manage Blocklist</a>
+>>>>>>> cea6978 (Reconnected project and updated files)
+                </div>
+            </div>
+        </div>
+    </div>
+<<<<<<< HEAD
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let attackChart;
+        let updateInterval;
+        
+        // Initialize dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                // Update quick stats
+                document.getElementById('totalAttacks').textContent = stats.total_attacks;
+                document.getElementById('todayAttacks').textContent = stats.recent_attacks;
+                document.getElementById('blockedIPs').textContent = stats.blocked_ips;
+                document.getElementById('activeAlerts').textContent = stats.total_alerts;
+                
+                // Update system status
+                const systemStatus = document.getElementById('systemStatus');
+                systemStatus.innerHTML = `
+                    <div class="mb-2">
+                        <i class="fas fa-circle ${stats.active_monitoring ? 'text-success' : 'text-danger'} me-2"></i>
+                        <span>Quorra SIEM ${stats.active_monitoring ? '(Running)' : '(Stopped)'}</span>
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-circle ${stats.ws_connected ? 'text-success' : 'text-warning'} me-2"></i>
+                        <span>Block Fortress ${stats.ws_connected ? '(Connected)' : '(Disconnected)'}</span>
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-circle text-success me-2"></i>
+                        <span>Database (${stats.total_logs} logs)</span>
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-circle text-success me-2"></i>
+                        <span>Rules Engine (${Object.keys(stats.attack_types || {}).length} patterns)</span>
+                    </div>
+                `;
+                
+                // Update monitoring button
+                const monitoringBtn = document.getElementById('monitoringBtn');
+                if (stats.active_monitoring) {
+                    monitoringBtn.innerHTML = '<i class="fas fa-pause me-2"></i>Pause Monitoring';
+                    monitoringBtn.onclick = stopMonitoring;
+                } else {
+                    monitoringBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Monitoring';
+                    monitoringBtn.onclick = startMonitoring;
+                }
+                
+                // Load recent attacks via API
+                const attacksResponse = await fetch('/api/attacks');
+                const attacks = await attacksResponse.json();
+                
+                let attacksHTML = '';
+                attacks.slice(0, 5).forEach(attack => {
+                    const time = new Date(attack.detected_at).toLocaleTimeString();
+                    const severityClass = `severity-${attack.severity}`;
+                    attacksHTML += `
+                        <div class="attack-${attack.severity} p-3 mb-2 rounded">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>${attack.attack_type}</strong>
+                                    <span class="severity-badge ${severityClass} ms-2">${attack.severity}</span>
+                                </div>
+                                <small>${time}</small>
+                            </div>
+                            <div class="small mt-1">
+                                <i class="fas fa-globe me-1"></i> ${attack.ip_address}
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('recentAttacks').innerHTML = attacksHTML || 
+                    '<p class="text-muted text-center py-3">No recent attacks</p>';
+                
+                // Load recent logs via API
+                const logsResponse = await fetch('/api/logs?per_page=5');
+                const logsData = await logsResponse.json();
+                
+                let logsHTML = '';
+                if (logsData.items && logsData.items.length > 0) {
+                    logsData.items.forEach(log => {
+                        const time = new Date(log.timestamp).toLocaleTimeString();
+                        logsHTML += `
+                            <div class="log-entry">
+                                <div class="d-flex justify-content-between">
+                                    <small><strong>${log.attack_type}</strong></small>
+                                    <small>${time}</small>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small><code>${log.ip_address}</code></small>
+                                    <span class="severity-badge severity-${log.severity}">${log.severity}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    logsHTML = '<p class="text-muted text-center py-3">No recent logs</p>';
+                }
+                document.getElementById('recentLogs').innerHTML = logsHTML;
+                
+                // Load active alerts via API
+                const alertsResponse = await fetch('/api/alerts');
+                const alerts = await alertsResponse.json();
+                
+                let alertsHTML = '';
+                const unreadAlerts = alerts.filter(a => !a.read).slice(0, 3);
+                
+                if (unreadAlerts.length > 0) {
+                    unreadAlerts.forEach(alert => {
+                        const time = new Date(alert.created_at).toLocaleTimeString();
+                        alertsHTML += `
+                            <div class="alert alert-${alert.severity === 'critical' ? 'danger' : 'warning'} mb-2">
+                                <div class="small">${time}</div>
+                                <div class="fw-bold">${alert.message}</div>
+                                <button class="btn btn-sm btn-outline-dark mt-2" onclick="acknowledgeAlert(${alert.id})">
+                                    Acknowledge
+                                </button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    alertsHTML = '<p class="text-muted text-center">No unread alerts</p>';
+                }
+                document.getElementById('activeAlertsList').innerHTML = alertsHTML;
+                
+                // Update chart
+                updateChart(stats);
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        function updateChart(stats) {
+            const ctx = document.getElementById('attackTimelineChart').getContext('2d');
+            
+            if (attackChart) {
+                attackChart.destroy();
+            }
+            
+            const hourlyData = stats.hourly_distribution || {};
+            const labels = Object.keys(hourlyData).reverse();
+            const data = Object.values(hourlyData).reverse();
+            
+            attackChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Attacks',
+                        data: data,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Control functions
+        async function startMonitoring() {
+            try {
+                const response = await fetch('/api/start_monitoring', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                alert(result.message);
+                loadDashboard();
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+                alert('Failed to start monitoring');
+            }
+        }
+        
+        async function stopMonitoring() {
+            try {
+                const response = await fetch('/api/stop_monitoring', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                alert(result.message);
+                loadDashboard();
+            } catch (error) {
+                console.error('Error stopping monitoring:', error);
+                alert('Failed to stop monitoring');
+            }
+        }
+        
+        async function acknowledgeAlert(alertId) {
+            try {
+                const response = await fetch(`/api/acknowledge_alert/${alertId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Error acknowledging alert:', error);
+            }
+        }
+        
+        function exportLogs() {
+            // Open export in new window
+            window.open('/api/logs/export?format=json', '_blank');
+        }
+        
+        // Auto-refresh every 10 seconds
+        updateInterval = setInterval(loadDashboard, 10000);
+        
+        // Initial load
+        loadDashboard();
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
+=======
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let attackChart;
+let monitoringOn = true;
+
+/* ── helpers ─────────────────────────────────── */
+function riskClass(score) {
+    if (score >= 80) return 'critical';
+    if (score >= 60) return 'high';
+    if (score >= 40) return 'medium';
+    if (score >= 20) return 'low';
+    return 'info';
+}
+
+function riskBar(score) {
+    const cls = riskClass(score);
+    const colors = {critical:'#ef4444',high:'#f97316',medium:'#eab308',low:'#22c55e',info:'#6b7280'};
+    return `<div class="risk-bar"><div class="risk-bar-fill" style="width:${score}%;background:${colors[cls]}"></div></div>`;
+}
+
+function mlTags(alert) {
+    const tags = [];
+    if (!alert) return '';
+    try {
+        const det = typeof alert.details === 'string' ? JSON.parse(alert.details) : (alert.details || {});
+        const flags = det.flags || [];
+        if (flags.includes('anomaly'))           tags.push('<span class="ml-tag ml-anomaly">anomaly</span>');
+        if (flags.includes('UEBA'))              tags.push('<span class="ml-tag ml-ueba">UEBA</span>');
+        if (flags.includes('sequential-pattern'))tags.push('<span class="ml-tag ml-lstm">LSTM</span>');
+        if (flags.includes('novel-log'))         tags.push('<span class="ml-tag ml-novel">novel</span>');
+        flags.filter(f=>f.startsWith('chain:')).forEach(f=>tags.push('<span class="ml-tag ml-chain">[chain]'+f.replace('chain:','')+'</span>'));
+        if (det.mitre_tactic && det.mitre_tactic !== 'N/A') tags.push(`<span class="ml-tag ml-mitre">${det.mitre_tactic.split(' ')[0]}</span>`);
+        if (det.risk_score)  return `<div class="mt-1">${riskBar(det.risk_score)} ${tags.join('')}</div>`;
+    } catch(e) {}
+    return '';
+}
+
+/* ── main load ───────────────────────────────── */
+async function loadDashboard() {
+    try {
+        const [statsRes, attacksRes, logsRes, alertsRes, mlRes] = await Promise.all([
+            fetch('/api/stats'),
+            fetch('/api/attacks'),
+            fetch('/api/logs?per_page=6'),
+            fetch('/api/alerts'),
+            fetch('/api/ml/summary').catch(() => ({ok:false})),
+        ]);
+        const stats   = await statsRes.json();
+        const attacks = await attacksRes.json();
+        const logsD   = await logsRes.json();
+        const alerts  = await alertsRes.json();
+        const ml      = mlRes.ok ? await mlRes.json() : null;
+
+        /* Stats */
+        document.getElementById('totalAttacks').textContent = stats.total_attacks;
+        document.getElementById('todayAttacks').textContent = stats.recent_attacks;
+        document.getElementById('blockedIPs').textContent   = stats.blocked_ips;
+        document.getElementById('mlEvents').textContent     = ml ? ml.total_events_analyzed : '—';
+        monitoringOn = stats.monitoring_active;
+
+        /* ML model status strip */
+        if (ml && ml.models_loaded) {
+            const names = {anomaly_detection:'Anomaly',autoencoder:'Autoencoder',threat_classifier:'Classifier',xgboost:'XGBoost',lstm:'LSTM',nlp_clusterer:'NLP',sbert:'SBERT'};
+            document.getElementById('mlStatusStrip').innerHTML = Object.entries(ml.models_loaded)
+                .map(([k,v]) => `<span style="font-size:.75rem"><span class="mdot ${v?'mdot-on':'mdot-off'}"></span>${names[k]||k}</span>`)
+                .join('');
+            document.getElementById('uebaCount').textContent = ml.ueba_profiles || 0;
+        } else {
+            document.getElementById('mlStatusStrip').innerHTML = '<span class="text-secondary" style="font-size:.75rem"><span class="mdot mdot-off"></span>ML not loaded — run training/train_all.py</span>';
+        }
+
+        /* System status */
+        document.getElementById('systemStatus').innerHTML = `
+            <div class="mb-2 small"><span class="mdot ${stats.active_monitoring?'mdot-on':'mdot-off'}"></span>Quorra SIEM (${stats.active_monitoring?'Running':'Stopped'})</div>
+            <div class="mb-2 small"><span class="mdot ${stats.ws_connected?'mdot-on':'mdot-off'}"></span>Block Fortress (${stats.ws_connected?'Connected':'Disconnected'})</div>
+            <div class="mb-2 small"><span class="mdot mdot-on"></span>Database (${stats.total_logs} logs)</div>
+            <div class="mb-2 small"><span class="mdot ${stats.ml_available?'mdot-on':'mdot-off'}"></span>ML Pipeline (${stats.ml_available?'Active':'Not loaded'})</div>
+        `;
+
+        /* Monitoring button */
+        const btn = document.getElementById('monitoringBtn');
+        btn.innerHTML = monitoringOn
+            ? '<i class="fas fa-pause me-2"></i>Pause Monitoring'
+            : '<i class="fas fa-play me-2"></i>Start Monitoring';
+
+        /* Chart */
+        buildChart(stats);
+
+        /* Recent attacks with ML */
+        const recentA = attacks.slice(0,5);
+        document.getElementById('recentAttacks').innerHTML = recentA.length
+            ? recentA.map(a => {
+                let det = {}; try { det = JSON.parse(a.details||'{}'); } catch(e){}
+                const rs = det.risk_score || det.ml_risk_score || null;
+                return `
+                <div class="d-flex align-items-start gap-3 log-row">
+                    ${rs !== null ? `<div class="risk-ring risk-${riskClass(rs)}">${rs}</div>` : `<div style="width:54px;flex-shrink:0"></div>`}
+                    <div class="flex-fill">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-600">${a.attack_type} <span class="sev sev-${a.severity}">${a.severity}</span></span>
+                            <small class="text-secondary">${new Date(a.detected_at).toLocaleTimeString()}</small>
+                        </div>
+                        <div class="small text-secondary"><i class="fas fa-globe me-1"></i><code>${a.ip_address}</code></div>
+                        ${rs !== null ? riskBar(rs) : ''}
+                    </div>
+                </div>`;
+            }).join('')
+            : '<p class="text-secondary small text-center py-3">No recent attacks</p>';
+
+        /* Recent logs with ML risk */
+        const logItems = logsD.items || [];
+        document.getElementById('recentLogs').innerHTML = logItems.length
+            ? logItems.map(l => {
+                let raw = {}; try { raw = JSON.parse(l.raw_data||'{}'); } catch(e){}
+                const rs = raw.ml_risk_score || null;
+                return `
+                <div class="log-row d-flex align-items-center gap-3">
+                    ${rs !== null ? `<div class="risk-ring risk-${riskClass(rs)}" style="font-size:.75rem;width:42px;height:42px">${rs}</div>` : ''}
+                    <div class="flex-fill">
+                        <div class="d-flex justify-content-between">
+                            <span class="small fw-600">${l.attack_type}</span>
+                            <span class="sev sev-${l.severity}">${l.severity}</span>
+                        </div>
+                        <div style="font-size:.75rem;color:#9ca3af"><code>${l.ip_address}</code> — ${l.endpoint}</div>
+                        <div style="font-size:.7rem;color:#6b7280">${new Date(l.timestamp).toLocaleString()}</div>
+                    </div>
+                </div>`;
+            }).join('')
+            : '<p class="text-secondary small text-center py-3">No logs yet</p>';
+
+        /* Top risky entities */
+        if (ml && ml.top_risky_entities && ml.top_risky_entities.length) {
+            document.getElementById('riskyEntities').innerHTML = ml.top_risky_entities.slice(0,5).map(e => {
+                const cls = riskClass(e.avg_risk);
+                const arrow = e.trend==='rising' ? '<span class="trend-up">↑</span>' : e.trend==='falling' ? '<span class="trend-down">↓</span>' : '<span class="trend-stable">→</span>';
+                return `
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="risk-ring risk-${cls}" style="width:38px;height:38px;font-size:.75rem">${Math.round(e.avg_risk)}</div>
+                    <div class="flex-fill">
+                        <div style="font-size:.78rem"><code>${e.entity_id}</code> ${arrow}</div>
+                        ${riskBar(e.avg_risk)}
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            document.getElementById('riskyEntities').innerHTML = '<p class="text-secondary small">No data — ML models need training.</p>';
+        }
+
+        /* Attack chains */
+        if (ml && ml.top_chain_entities && ml.top_chain_entities.length) {
+            document.getElementById('attackChains').innerHTML = ml.top_chain_entities.slice(0,4).map(e => `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <code style="font-size:.75rem">${e.entity_id}</code>
+                        <div style="font-size:.7rem;color:#9ca3af">${e.chains} chain(s) detected</div>
+                    </div>
+                    <span class="sev sev-${riskClass(e.chain_risk*100)}">${Math.round(e.chain_risk*100)}%</span>
+                </div>`).join('');
+        } else {
+            document.getElementById('attackChains').innerHTML = '<p class="text-secondary small">No attack chains detected.</p>';
+        }
+
+        /* Active alerts */
+        const unread = alerts.filter(a => !a.is_read).slice(0,4);
+        document.getElementById('activeAlertsList').innerHTML = unread.length
+            ? unread.map(a => {
+                const det = mlTags(a);
+                return `
+                <div class="mb-2 p-2 rounded" style="background:rgba(${a.severity==='critical'?'239,68,68':'249,115,22'},.08);border:1px solid rgba(${a.severity==='critical'?'239,68,68':'249,115,22'},.2)">
+                    <div class="d-flex justify-content-between">
+                        <span style="font-size:.78rem;font-weight:600">${a.message.substring(0,55)}${a.message.length>55?'…':''}</span>
+                        <button class="btn btn-sm p-0 ps-2 text-secondary" style="font-size:.7rem" onclick="ackAlert(${a.id})">Ack</button>
+                    </div>
+                    ${det}
+                </div>`;
+            }).join('')
+            : '<p class="text-secondary small text-center">No unread alerts</p>';
+
+    } catch(e) { console.error('Dashboard error:', e); }
+}
+
+function buildChart(stats) {
+    const ctx = document.getElementById('attackTimelineChart').getContext('2d');
+    if (attackChart) attackChart.destroy();
+    const hourly = stats.hourly_distribution || {};
+    attackChart = new Chart(ctx, {
+        type:'line',
+        data:{
+            labels: Object.keys(hourly),
+            datasets:[{ label:'Attacks', data:Object.values(hourly),
+                borderColor:'#a78bfa', backgroundColor:'rgba(167,139,250,.08)',
+                borderWidth:2, fill:true, tension:.4, pointRadius:3, pointBackgroundColor:'#a78bfa' }]
+        },
+        options:{ responsive:true, plugins:{legend:{display:false}},
+            scales:{
+                y:{ beginAtZero:true, grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#6b7280',font:{size:10}} },
+                x:{ grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#6b7280',font:{size:10}} }
+            }
+        }
+    });
+}
+
+async function toggleMonitoring() {
+    const url = monitoringOn ? '/api/stop_monitoring' : '/api/start_monitoring';
+    await fetch(url, {method:'POST'});
+    monitoringOn = !monitoringOn;
+    loadDashboard();
+}
+
+async function ackAlert(id) {
+    await fetch(`/api/acknowledge_alert/${id}`, {method:'POST'});
+    loadDashboard();
+}
+
+setInterval(loadDashboard, 10000);
+loadDashboard();
+</script>
+</body>
+</html>
+>>>>>>> cea6978 (Reconnected project and updated files)

@@ -1,0 +1,7 @@
+{
+  "trained_at": "2026-03-27T19:24:16.461913",
+  "total_logs": 600,
+  "ueba_entities": 1,
+  "anomaly_model": "IsolationForest",
+  "sklearn": true
+}

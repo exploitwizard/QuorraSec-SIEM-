@@ -1,0 +1,12 @@
+# Quorra SIEM IP Blocklist
+# Format: IP_address reason [blocked_by] [timestamp]
+
+# Example entries:
+127.0.0.1 Localhost testing system 2024-01-15T10:30:00
+192.168.1.100 Multiple SQL injection attempts system 2024-01-15T11:45:00
+10.0.0.50 Brute force attack on login system 2024-01-15T12:15:00
+172.16.0.25 Command injection attempt user-quorra 2024-01-15T13:20:00
+203.0.113.45 XSS attack on contact form system 2024-01-15T14:05:00
+
+# Note: This file is for reference only.
+# The actual blocklist is stored in the database.

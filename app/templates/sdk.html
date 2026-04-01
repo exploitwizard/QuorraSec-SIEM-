@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quorra SIEM - SDK Integration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg,#0d0d1a 0%,#111827 100%); color:#e5e7eb; min-height:100vh; font-family:'Segoe UI',sans-serif; }
+
+        /* Nav */
+        .navbar { background:#0a0a14 !important; border-bottom:1px solid rgba(99,102,241,.25); }
+        .nav-link { color:rgba(255,255,255,.65) !important; font-size:.85rem; }
+        .nav-link:hover,.nav-link.active { color:#a78bfa !important; }
+        .nav-link.active { border-bottom:2px solid #a78bfa; }
+
+        .g-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:24px; margin-bottom:20px; }
+        .g-card:hover { border-color:rgba(99,102,241,.35); }
+
+        .sec-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:#6b7280; margin-bottom:12px; font-weight:600; }
+
+        pre { background:#0a0a14; border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:18px; font-size:.82rem; line-height:1.6; overflow-x:auto; color:#e2e8f0; }
+        code { color:#a78bfa; }
+        pre code { color:#e2e8f0; }
+
+        .copy-btn { position:absolute; top:10px; right:10px; background:rgba(99,102,241,.2); border:1px solid rgba(99,102,241,.4); color:#a78bfa; border-radius:6px; padding:3px 10px; font-size:.72rem; cursor:pointer; }
+        .copy-btn:hover { background:rgba(99,102,241,.4); }
+
+        .option-table td, .option-table th { padding:8px 14px; font-size:.83rem; border-color:rgba(255,255,255,.08) !important; }
+        .option-table th { color:#9ca3af; font-weight:500; }
+        .option-table tr:hover td { background:rgba(255,255,255,.03); }
+
+        .badge-type { padding:2px 8px; border-radius:99px; font-size:.7rem; font-weight:600; }
+        .badge-string { background:rgba(99,102,241,.2); color:#c7d2fe; border:1px solid rgba(99,102,241,.3); }
+        .badge-bool   { background:rgba(34,197,94,.2); color:#86efac; border:1px solid rgba(34,197,94,.3); }
+        .badge-num    { background:rgba(249,115,22,.2); color:#fdba74; border:1px solid rgba(249,115,22,.3); }
+        .badge-obj    { background:rgba(234,179,8,.2); color:#fde68a; border:1px solid rgba(234,179,8,.3); }
+        .badge-fn     { background:rgba(168,85,247,.2); color:#d8b4fe; border:1px solid rgba(168,85,247,.3); }
+
+        .event-pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:.72rem; margin:2px; background:rgba(99,102,241,.15); color:#c7d2fe; border:1px solid rgba(99,102,241,.3); }
+
+        .live-badge { animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        .step-num { width:28px; height:28px; border-radius:50%; background:rgba(99,102,241,.3); border:1px solid rgba(99,102,241,.6); color:#a78bfa; font-weight:700; font-size:.85rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+        #testStatus { transition:all .3s; }
+        .test-success { background:rgba(34,197,94,.1) !important; border-color:rgba(34,197,94,.4) !important; }
+        .test-error   { background:rgba(239,68,68,.1) !important; border-color:rgba(239,68,68,.4)  !important; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM
+            <span class="badge ms-2" style="background:#1e1b4b;color:#a78bfa;font-size:.65rem">v2.0</span>
+            <span class="badge bg-success ms-1 live-badge" style="font-size:.65rem">LIVE</span>
+        </a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link px-2" href="/dashboard"><i class="fas fa-chart-line me-1"></i>Dashboard</a>
+            <a class="nav-link px-2" href="/logs"><i class="fas fa-list me-1"></i>Logs</a>
+            <a class="nav-link px-2" href="/attacks"><i class="fas fa-bug me-1"></i>Attacks</a>
+            <a class="nav-link px-2" href="/alerts"><i class="fas fa-bell me-1"></i>Alerts</a>
+            <a class="nav-link px-2" href="/blocklist"><i class="fas fa-ban me-1"></i>Blocklist</a>
+            <a class="nav-link active px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="fw-bold mb-1" style="color:#a78bfa"><i class="fas fa-code me-2"></i>JavaScript SDK</h4>
+            <p class="text-secondary mb-0" style="font-size:.88rem">
+                Drop-in browser agent for real-time attack detection. Monitors XHR, fetch, form inputs, DOM mutations, and errors — and streams events to Quorra.
+            </p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Left column: install + config -->
+        <div class="col-lg-7">
+
+            <!-- Quick start -->
+            <div class="g-card">
+                <div class="sec-head">Quick Start</div>
+
+                <div class="d-flex align-items-start gap-3 mb-3">
+                    <div class="step-num">1</div>
+                    <div>
+                        <div class="fw-semibold mb-1" style="font-size:.88rem">Add the script tag</div>
+                        <p class="text-secondary mb-2" style="font-size:.82rem">
+                            Place this in the <code>&lt;head&gt;</code> of every page you want to monitor.
+                        </p>
+                        <div class="position-relative">
+                            <pre><code id="snippet1">&lt;script src="http://YOUR-QUORRA-HOST:5001/quorra-sdk.js"&gt;&lt;/script&gt;</code></pre>
+                            <button class="copy-btn" onclick="copyCode('snippet1')"><i class="fas fa-copy me-1"></i>Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3 mb-3">
+                    <div class="step-num">2</div>
+                    <div style="flex:1">
+                        <div class="fw-semibold mb-1" style="font-size:.88rem">Initialize</div>
+                        <p class="text-secondary mb-2" style="font-size:.82rem">
+                            Call <code>QuorraSDK.init()</code> once after the script loads.
+                        </p>
+                        <div class="position-relative">
+                            <pre><code id="snippet2">QuorraSDK.init({
+  endpoint:  "http://YOUR-QUORRA-HOST:5001/ingest",
+  apiKey:    "YOUR_INGEST_API_KEY",   // matches INGEST_API_KEY env var
+  appId:     "my-app",
+  debug:     false
+});</code></pre>
+                            <button class="copy-btn" onclick="copyCode('snippet2')"><i class="fas fa-copy me-1"></i>Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3">
+                    <div class="step-num">3</div>
+                    <div style="flex:1">
+                        <div class="fw-semibold mb-1" style="font-size:.88rem">Optionally attach a user</div>
+                        <div class="position-relative">
+                            <pre><code id="snippet3">// Call after login
+QuorraSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
+                            <button class="copy-btn" onclick="copyCode('snippet3')"><i class="fas fa-copy me-1"></i>Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration reference -->
+            <div class="g-card">
+                <div class="sec-head">Configuration Options</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-borderless option-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Option</th>
+                                <th>Type</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>endpoint</code></td>
+                                <td><span class="badge-type badge-string">string</span></td>
+                                <td><code>:5001/ingest</code></td>
+                                <td class="text-secondary">Full URL of the Quorra /ingest endpoint</td>
+                            </tr>
+                            <tr>
+                                <td><code>apiKey</code></td>
+                                <td><span class="badge-type badge-string">string</span></td>
+                                <td><code>""</code></td>
+                                <td class="text-secondary">Sent as <code>X-Quorra-Key</code> header. Must match <code>INGEST_API_KEY</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>appId</code></td>
+                                <td><span class="badge-type badge-string">string</span></td>
+                                <td><code>"web"</code></td>
+                                <td class="text-secondary">Identifies the monitored application in logs</td>
+                            </tr>
+                            <tr>
+                                <td><code>batchSize</code></td>
+                                <td><span class="badge-type badge-num">number</span></td>
+                                <td><code>10</code></td>
+                                <td class="text-secondary">Flush queue after this many events</td>
+                            </tr>
+                            <tr>
+                                <td><code>flushInterval</code></td>
+                                <td><span class="badge-type badge-num">number</span></td>
+                                <td><code>5000</code></td>
+                                <td class="text-secondary">Periodic flush in milliseconds</td>
+                            </tr>
+                            <tr>
+                                <td><code>dedupWindow</code></td>
+                                <td><span class="badge-type badge-num">number</span></td>
+                                <td><code>30000</code></td>
+                                <td class="text-secondary">Suppress identical events within this window (ms)</td>
+                            </tr>
+                            <tr>
+                                <td><code>debug</code></td>
+                                <td><span class="badge-type badge-bool">boolean</span></td>
+                                <td><code>false</code></td>
+                                <td class="text-secondary">Log SDK activity to the browser console</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Public API -->
+            <div class="g-card">
+                <div class="sec-head">Public API</div>
+
+                <div class="mb-4">
+                    <div class="fw-semibold mb-1" style="font-size:.88rem"><code>QuorraSDK.init(config)</code></div>
+                    <p class="text-secondary mb-2" style="font-size:.82rem">Initialize and activate the SDK. Must be called once before any other method.</p>
+                    <div class="position-relative">
+                        <pre><code id="api1">QuorraSDK.init({ endpoint: "...", apiKey: "...", appId: "my-app" });</code></pre>
+                        <button class="copy-btn" onclick="copyCode('api1')"><i class="fas fa-copy me-1"></i>Copy</button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="fw-semibold mb-1" style="font-size:.88rem"><code>QuorraSDK.setUser(user)</code></div>
+                    <p class="text-secondary mb-2" style="font-size:.82rem">Attach user context to all subsequent events.</p>
+                    <div class="position-relative">
+                        <pre><code id="api2">QuorraSDK.setUser({ id: "user-42", role: "admin", name: "Alice" });</code></pre>
+                        <button class="copy-btn" onclick="copyCode('api2')"><i class="fas fa-copy me-1"></i>Copy</button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="fw-semibold mb-1" style="font-size:.88rem"><code>QuorraSDK.captureEvent(event)</code></div>
+                    <p class="text-secondary mb-2" style="font-size:.82rem">Manually report a custom security event.</p>
+                    <div class="position-relative">
+                        <pre><code id="api3">QuorraSDK.captureEvent({
+  attackType: "privilege_escalation",
+  endpoint:   "/admin/users",
+  severity:   "high",
+  payload:    "attempted role change to admin"
+});</code></pre>
+                        <button class="copy-btn" onclick="copyCode('api3')"><i class="fas fa-copy me-1"></i>Copy</button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="fw-semibold mb-1" style="font-size:.88rem"><code>QuorraSDK.captureError(error, context)</code></div>
+                    <p class="text-secondary mb-2" style="font-size:.82rem">Report a JavaScript error with optional context object.</p>
+                    <div class="position-relative">
+                        <pre><code id="api4">try {
+  riskyOperation();
+} catch (err) {
+  QuorraSDK.captureError(err, { component: "checkout", userId: "u-99" });
+}</code></pre>
+                        <button class="copy-btn" onclick="copyCode('api4')"><i class="fas fa-copy me-1"></i>Copy</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="fw-semibold mb-1" style="font-size:.88rem"><code>QuorraSDK.flush()</code></div>
+                    <p class="text-secondary mb-2" style="font-size:.82rem">Immediately send all queued events without waiting for the next interval.</p>
+                    <div class="position-relative">
+                        <pre><code id="api5">// Force-send before a critical navigation
+QuorraSDK.flush();</code></pre>
+                        <button class="copy-btn" onclick="copyCode('api5')"><i class="fas fa-copy me-1"></i>Copy</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right column: what it detects + live test -->
+        <div class="col-lg-5">
+
+            <!-- Auto-detected events -->
+            <div class="g-card">
+                <div class="sec-head">Auto-Detected Events</div>
+                <p class="text-secondary mb-3" style="font-size:.82rem">
+                    The SDK hooks into the browser automatically. No additional code needed for these.
+                </p>
+
+                <div class="mb-3">
+                    <div class="fw-semibold mb-2" style="font-size:.83rem; color:#a78bfa">
+                        <i class="fas fa-globe me-1"></i> XHR &amp; Fetch Monitoring
+                    </div>
+                    <ul class="text-secondary mb-0" style="font-size:.82rem; padding-left:1.2rem; line-height:1.9">
+                        <li>Scans request URLs and bodies for attack patterns</li>
+                        <li>Captures 4xx / 5xx error responses</li>
+                        <li>Detects payload injection before the request is sent</li>
+                    </ul>
+                </div>
+
+                <div class="mb-3">
+                    <div class="fw-semibold mb-2" style="font-size:.83rem; color:#a78bfa">
+                        <i class="fas fa-keyboard me-1"></i> Form &amp; Input Scanning
+                    </div>
+                    <ul class="text-secondary mb-0" style="font-size:.82rem; padding-left:1.2rem; line-height:1.9">
+                        <li>Inspects all form field values on submit</li>
+                        <li>Reports the field name, value, and matched pattern</li>
+                    </ul>
+                </div>
+
+                <div class="mb-3">
+                    <div class="fw-semibold mb-2" style="font-size:.83rem; color:#a78bfa">
+                        <i class="fas fa-exclamation-triangle me-1"></i> JavaScript Errors
+                    </div>
+                    <ul class="text-secondary mb-0" style="font-size:.82rem; padding-left:1.2rem; line-height:1.9">
+                        <li>Uncaught exceptions via <code>window.onerror</code></li>
+                        <li>Unhandled promise rejections</li>
+                        <li>Includes stack trace and file/line info</li>
+                    </ul>
+                </div>
+
+                <div class="mb-3">
+                    <div class="fw-semibold mb-2" style="font-size:.83rem; color:#a78bfa">
+                        <i class="fas fa-code me-1"></i> DOM &amp; Page Security
+                    </div>
+                    <ul class="text-secondary mb-0" style="font-size:.82rem; padding-left:1.2rem; line-height:1.9">
+                        <li>MutationObserver detects dynamically injected <code>&lt;script&gt;</code> tags</li>
+                        <li>Clickjacking detection (<code>self !== top</code>)</li>
+                    </ul>
+                </div>
+
+                <div class="sec-head mt-3">Attack Patterns Detected</div>
+                <div>
+                    <span class="event-pill">XSS</span>
+                    <span class="event-pill">SQL Injection</span>
+                    <span class="event-pill">Path Traversal</span>
+                    <span class="event-pill">Command Injection</span>
+                    <span class="event-pill">HTTP 4xx/5xx</span>
+                    <span class="event-pill">DOM Script Inject</span>
+                    <span class="event-pill">Clickjacking</span>
+                    <span class="event-pill">JS Errors</span>
+                    <span class="event-pill">Custom Events</span>
+                </div>
+            </div>
+
+            <!-- Event payload structure -->
+            <div class="g-card">
+                <div class="sec-head">Event Payload Structure</div>
+                <p class="text-secondary mb-2" style="font-size:.82rem">Each event sent to <code>/ingest</code> looks like this:</p>
+                <div class="position-relative">
+                    <pre><code id="payload">{
+  "ipAddress":  "&lt;client IP resolved server-side&gt;",
+  "attackType": "xss_attempt",
+  "endpoint":   "/search?q=...",
+  "severity":   "high",
+  "payload":    "&lt;script&gt;alert(1)&lt;/script&gt;",
+  "source":     "quorra-sdk",
+  "appId":      "my-app",
+  "sessionId":  "sdk-a3f9...",
+  "user":       { "id": "u-42", "role": "admin" },
+  "url":        "https://app.example.com/search",
+  "userAgent":  "Mozilla/5.0 ..."
+}</code></pre>
+                    <button class="copy-btn" onclick="copyCode('payload')"><i class="fas fa-copy me-1"></i>Copy</button>
+                </div>
+            </div>
+
+            <!-- Live test panel -->
+            <div class="g-card" id="testPanel">
+                <div class="sec-head">Live Connection Test</div>
+                <p class="text-secondary mb-3" style="font-size:.82rem">
+                    Send a test event directly to your Quorra instance to verify the SDK can reach it.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label" style="font-size:.8rem;color:#9ca3af">Quorra /ingest URL</label>
+                    <input type="text" class="form-control form-control-sm" id="testEndpoint"
+                        style="background:#0a0a14;border-color:rgba(255,255,255,.15);color:#e5e7eb;font-size:.82rem"
+                        placeholder="http://localhost:5001/ingest">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size:.8rem;color:#9ca3af">API Key (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="testApiKey"
+                        style="background:#0a0a14;border-color:rgba(255,255,255,.15);color:#e5e7eb;font-size:.82rem"
+                        placeholder="leave blank if INGEST_API_KEY is not set">
+                </div>
+
+                <button class="btn btn-sm w-100 mb-3" id="testBtn"
+                    style="background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.5);color:#a78bfa"
+                    onclick="runTest()">
+                    <i class="fas fa-paper-plane me-1"></i>Send Test Event
+                </button>
+
+                <div id="testStatus" class="g-card mb-0" style="display:none;padding:14px">
+                    <div id="testStatusMsg" style="font-size:.83rem"></div>
+                </div>
+            </div>
+
+        </div>
+
+    </div><!-- /row -->
+
+</div><!-- /container -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function copyCode(id) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target.closest('.copy-btn');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    });
+}
+
+async function runTest() {
+    const endpoint = document.getElementById('testEndpoint').value.trim()
+                  || 'http://localhost:5001/ingest';
+    const apiKey   = document.getElementById('testApiKey').value.trim();
+    const btn      = document.getElementById('testBtn');
+    const status   = document.getElementById('testStatus');
+    const msg      = document.getElementById('testStatusMsg');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...';
+
+    const payload = {
+        ipAddress:  "sdk-test",
+        attackType: "sdk_connection_test",
+        endpoint:   "/sdk-test",
+        severity:   "info",
+        payload:    "Quorra SDK connection test from integration page",
+        source:     "quorra-sdk",
+        appId:      "sdk-test",
+        sessionId:  "sdk-test-session",
+        url:        window.location.href,
+        userAgent:  navigator.userAgent
+    };
+
+    const headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-Quorra-Key"] = apiKey;
+
+    try {
+        const resp = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json().catch(() => ({}));
+        status.style.display = 'block';
+        if (resp.ok) {
+            status.classList.add('test-success');
+            status.classList.remove('test-error');
+            msg.innerHTML = `<span style="color:#86efac"><i class="fas fa-check-circle me-1"></i>Connected</span>
+                <span class="text-secondary ms-2">HTTP ${resp.status}</span>
+                <div class="mt-1 text-secondary" style="font-size:.78rem">${JSON.stringify(data)}</div>`;
+        } else {
+            status.classList.add('test-error');
+            status.classList.remove('test-success');
+            msg.innerHTML = `<span style="color:#fca5a5"><i class="fas fa-times-circle me-1"></i>Error HTTP ${resp.status}</span>
+                <div class="mt-1 text-secondary" style="font-size:.78rem">${JSON.stringify(data)}</div>`;
+        }
+    } catch (err) {
+        status.style.display = 'block';
+        status.classList.add('test-error');
+        status.classList.remove('test-success');
+        msg.innerHTML = `<span style="color:#fca5a5"><i class="fas fa-times-circle me-1"></i>Request failed</span>
+            <div class="mt-1 text-secondary" style="font-size:.78rem">${err.message}</div>
+            <div class="mt-1 text-secondary" style="font-size:.75rem">Check that Quorra is running and CORS is enabled for this origin.</div>`;
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Test Event';
+}
+</script>
+</body>
+</html>

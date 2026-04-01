@@ -1,0 +1,243 @@
+<<<<<<< HEAD
+import os
+=======
+# app/config.py
+import os
+import sys
+import secrets
+>>>>>>> cea6978 (Reconnected project and updated files)
+from pathlib import Path
+from datetime import timedelta
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+<<<<<<< HEAD
+class Config:
+    """Application configuration."""
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'quorra-siem-secret-key-2024'
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{BASE_DIR}/data/quorra.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Session configuration
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
+    SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    
+    # Authentication
+    QUORRA_USERNAME = 'user-quorra'
+    QUORRA_PASSWORD = 'quorra@1000'
+    
+    # Log collection settings
+    BLOCK_FORTRESS_URL = os.environ.get('BLOCK_FORTRESS_URL', 'http://localhost:5000')
+    BLOCK_FORTRESS_WS_URL = os.environ.get('BLOCK_FORTRESS_WS_URL', 'ws://localhost:5000/api/ws/logs')
+    
+    # Rule settings
+    BRUTEFORCE_THRESHOLD = 10
+    BRUTEFORCE_WINDOW = 120  # 2 minutes in seconds
+    GEO_VELOCITY_THRESHOLD = 300  # 300 km distance threshold
+    MULTI_ATTACK_THRESHOLD = 3  # 3 different attack types in 5 minutes
+    
+    # Alert settings
+    ALERT_RETENTION_DAYS = 30
+    EMAIL_ENABLED = False
+    
+    # Monitoring settings
+    MONITORING_INTERVAL = 5  # seconds
+    WS_RECONNECT_DELAY = 5  # seconds
+    
+    # File paths
+    DATA_DIR = os.path.join(BASE_DIR, 'data')
+    LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+    TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
+    
+    # GeoIP settings
+    GEOIP_DB_PATH = os.path.join(DATA_DIR, 'geolite', 'GeoLite2-City.mmdb')
+=======
+# ---------------------------------------------------------------------------
+# Platform-aware user data directory
+# Uses platformdirs when available; falls back to BASE_DIR-relative paths.
+# ---------------------------------------------------------------------------
+def _get_platform_data_dir() -> Path:
+    try:
+        from platformdirs import user_data_dir
+        d = Path(user_data_dir("QuorraSIEM", "QuorraSIEM"))
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    except ImportError:
+        return BASE_DIR / "data"
+
+def _get_platform_log_dir() -> Path:
+    try:
+        from platformdirs import user_log_dir
+        d = Path(user_log_dir("QuorraSIEM", "QuorraSIEM"))
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    except ImportError:
+        return BASE_DIR / "logs"
+
+# ---------------------------------------------------------------------------
+# Persistent SECRET_KEY
+# Order: env var → .quorra-secret file in data dir → generate + persist
+# This ensures sessions survive restarts without requiring manual config.
+# ---------------------------------------------------------------------------
+def _get_or_create_secret_key() -> str:
+    env_key = os.environ.get("SECRET_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    data_dir = BASE_DIR / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    secret_file = data_dir / ".quorra-secret"
+
+    if secret_file.exists():
+        key = secret_file.read_text().strip()
+        if len(key) >= 32:
+            return key
+
+    key = secrets.token_hex(32)
+    try:
+        secret_file.write_text(key)
+        # Restrict read permissions on Unix
+        if sys.platform != "win32":
+            secret_file.chmod(0o600)
+    except OSError:
+        print("Warning: Could not persist SECRET_KEY to disk. Sessions will not survive restarts.")
+    return key
+
+
+_secret_key = _get_or_create_secret_key()
+
+
+class Config:
+    """Application configuration — all settings overridable via environment variables."""
+
+    # -----------------------------------------------------------------------
+    # Core Flask
+    # -----------------------------------------------------------------------
+    SECRET_KEY = _secret_key
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # -----------------------------------------------------------------------
+    # Database
+    # DB_PATH env var overrides the default (useful on Windows where
+    # C:\Program Files is read-only).
+    # -----------------------------------------------------------------------
+    _db_path = os.environ.get("DB_PATH") or str(BASE_DIR / "data" / "quorra.db")
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{_db_path}"
+
+    # Enable WAL mode for better concurrency on all platforms
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {"check_same_thread": False},
+        "pool_pre_ping": True,
+    }
+
+    # -----------------------------------------------------------------------
+    # Ingest API key — MUST be set via environment variable.
+    # If empty, only localhost connections are accepted (see main.py).
+    # -----------------------------------------------------------------------
+    INGEST_API_KEY = os.environ.get("INGEST_API_KEY", "")
+
+    # -----------------------------------------------------------------------
+    # Session
+    # -----------------------------------------------------------------------
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+
+    # -----------------------------------------------------------------------
+    # Authentication
+    # -----------------------------------------------------------------------
+    QUORRA_USERNAME = os.environ.get("QUORRA_USERNAME", "user-quorra")
+    QUORRA_PASSWORD = os.environ.get("QUORRA_PASSWORD", "quorra@1000")
+
+    # Force a password change on the first login for the default account.
+    # Set to "false" to disable (not recommended for production).
+    FORCE_PASSWORD_CHANGE = os.environ.get("FORCE_PASSWORD_CHANGE", "true").lower() == "true"
+
+    # -----------------------------------------------------------------------
+    # TOTP / 2FA
+    # -----------------------------------------------------------------------
+    TOTP_ISSUER = os.environ.get("TOTP_ISSUER", "QuorraSIEM")
+    TOTP_ENABLED_DEFAULT = False   # Users opt-in via the UI
+
+    # -----------------------------------------------------------------------
+    # Block Fortress integration
+    # -----------------------------------------------------------------------
+    BLOCK_FORTRESS_URL = os.environ.get("BLOCK_FORTRESS_URL", "http://localhost:5000")
+    BLOCK_FORTRESS_WS_URL = os.environ.get(
+        "BLOCK_FORTRESS_WS_URL", "ws://localhost:5000/api/ws/logs"
+    )
+
+    # -----------------------------------------------------------------------
+    # Detection thresholds
+    # -----------------------------------------------------------------------
+    BRUTEFORCE_THRESHOLD = int(os.environ.get("BRUTEFORCE_THRESHOLD", "10"))
+    BRUTEFORCE_WINDOW = int(os.environ.get("BRUTEFORCE_WINDOW", "120"))   # seconds
+    GEO_VELOCITY_THRESHOLD = int(os.environ.get("GEO_VELOCITY_THRESHOLD", "300"))  # km
+    MULTI_ATTACK_THRESHOLD = int(os.environ.get("MULTI_ATTACK_THRESHOLD", "3"))
+
+    # -----------------------------------------------------------------------
+    # Alerts
+    # -----------------------------------------------------------------------
+    ALERT_RETENTION_DAYS = int(os.environ.get("ALERT_RETENTION_DAYS", "30"))
+    EMAIL_ENABLED = os.environ.get("EMAIL_ENABLED", "false").lower() == "true"
+
+    # Slack incoming webhook URL (set to enable Slack alerts)
+    SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+
+    # Generic outbound webhook URL (receives JSON POST on every high/critical alert)
+    ALERT_WEBHOOK_URL = os.environ.get("ALERT_WEBHOOK_URL", "")
+
+    # Microsoft Teams incoming webhook URL
+    TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
+
+    # -----------------------------------------------------------------------
+    # Monitoring / WebSocket reconnect
+    # -----------------------------------------------------------------------
+    MONITORING_INTERVAL = int(os.environ.get("MONITORING_INTERVAL", "5"))
+    WS_RECONNECT_DELAY = int(os.environ.get("WS_RECONNECT_DELAY", "5"))
+
+    # -----------------------------------------------------------------------
+    # Rate limiting (Flask-Limiter)
+    # -----------------------------------------------------------------------
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_INGEST = os.environ.get("RATELIMIT_INGEST", "200 per minute")
+    RATELIMIT_LOGIN = os.environ.get("RATELIMIT_LOGIN", "20 per minute")
+
+    # -----------------------------------------------------------------------
+    # Syslog UDP/TCP listener
+    # -----------------------------------------------------------------------
+    SYSLOG_LISTENER_ENABLED = os.environ.get("SYSLOG_LISTENER_ENABLED", "false").lower() == "true"
+    SYSLOG_HOST = os.environ.get("SYSLOG_HOST", "0.0.0.0")
+    SYSLOG_UDP_PORT = int(os.environ.get("SYSLOG_UDP_PORT", "5140"))   # 514 needs root; 5140 does not
+    SYSLOG_TCP_PORT = int(os.environ.get("SYSLOG_TCP_PORT", "5141"))
+
+    # -----------------------------------------------------------------------
+    # Prometheus metrics
+    # -----------------------------------------------------------------------
+    METRICS_ENABLED = os.environ.get("METRICS_ENABLED", "true").lower() == "true"
+    # Optional bearer token to protect /metrics — leave empty for open access
+    METRICS_TOKEN = os.environ.get("METRICS_TOKEN", "")
+
+    # -----------------------------------------------------------------------
+    # HTTPS / TLS (self-signed cert for local use)
+    # Set TLS_ENABLED=true + TLS_CERT_FILE + TLS_KEY_FILE to enable
+    # -----------------------------------------------------------------------
+    TLS_ENABLED = os.environ.get("TLS_ENABLED", "false").lower() == "true"
+    TLS_CERT_FILE = os.environ.get("TLS_CERT_FILE", str(BASE_DIR / "data" / "tls" / "cert.pem"))
+    TLS_KEY_FILE = os.environ.get("TLS_KEY_FILE", str(BASE_DIR / "data" / "tls" / "key.pem"))
+
+    # -----------------------------------------------------------------------
+    # File paths (all resolved relative to BASE_DIR for portability)
+    # -----------------------------------------------------------------------
+    DATA_DIR = str(BASE_DIR / "data")
+    LOGS_DIR = str(BASE_DIR / "logs")
+    TEMPLATES_DIR = str(BASE_DIR / "app" / "templates")
+
+    GEOIP_DB_PATH = str(BASE_DIR / "data" / "geolite" / "GeoLite2-City.mmdb")
+
+    # MaxMind license key for automatic GeoLite2 download (set to enable)
+    MAXMIND_LICENSE_KEY = os.environ.get("MAXMIND_LICENSE_KEY", "")
+>>>>>>> cea6978 (Reconnected project and updated files)

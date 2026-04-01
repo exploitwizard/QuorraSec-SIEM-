@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
+    <title>Quorra SIEM - Security Alerts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .alert-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .alert-card.read {
+            opacity: 0.7;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .alert-card:hover {
+            transform: translateX(5px);
+        }
+        
+        .severity-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        
+        .severity-critical { 
+            background: linear-gradient(135deg, #dc3545 0%, #a71d2a 100%);
+            border-left: 4px solid #dc3545;
+        }
+        .severity-high { 
+            background: linear-gradient(135deg, #fd7e14 0%, #c9680c 100%);
+            border-left: 4px solid #fd7e14;
+        }
+        .severity-medium { 
+            background: linear-gradient(135deg, #ffc107 0%, #d39e00 100%);
+            border-left: 4px solid #ffc107;
+            color: #000;
+        }
+        .severity-low { 
+            background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+            border-left: 4px solid #0dcaf0;
+        }
+        .severity-info { 
+            background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
+            border-left: 4px solid #6c757d;
+        }
+        
+        .alert-details {
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        
+        .live-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.3;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>
+                <span class="fw-bold">QUORRA SIEM</span>
+                <span class="badge bg-primary ms-2">v1.0</span>
+                <span class="badge bg-success ms-2 live-badge">LIVE</span>
+            </a>
+
+            <div class="navbar-nav flex-row align-items-center">
+                <span class="text-light me-3">
+                    <i class="fas fa-user-circle me-1"></i>
+                    {{ username }}
+                </span>
+
+                <a class="nav-link mx-3" href="/dashboard">
+                    <i class="fas fa-chart-line me-1"></i> Dashboard
+                </a>
+
+                <a class="nav-link mx-3" href="/logs">
+                    <i class="fas fa-list me-1"></i> Logs
+                </a>
+
+                <a class="nav-link mx-3" href="/attacks">
+                    <i class="fas fa-bug me-1"></i> Attacks
+                </a>
+
+                <a class="nav-link mx-3 active" href="/alerts">
+                    <i class="fas fa-bell me-1"></i> Alerts
+                </a>
+
+                <a class="nav-link mx-3" href="/blocklist">
+                    <i class="fas fa-ban me-1"></i> Blocklist
+                </a>
+
+                <a class="nav-link mx-3 text-warning" href="/logout">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-bell me-2"></i>Security Alerts
+                    </h1>
+                    <div>
+                        <button class="btn btn-outline-light me-2" onclick="refreshAlerts()">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="clearReadAlerts()">
+                            <i class="fas fa-trash me-1"></i> Clear Read Alerts
+                        </button>
+                    </div>
+                </div>
+                <p class="text-muted mb-0">Security alerts and notifications</p>
+            </div>
+        </div>
+        
+        <!-- Alert Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="alert-card p-3 text-center">
+                    <div class="display-6 fw-bold text-primary" id="totalAlerts">0</div>
+                    <div class="text-muted">Total Alerts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="alert-card p-3 text-center">
+                    <div class="display-6 fw-bold text-warning" id="unreadAlerts">0</div>
+                    <div class="text-muted">Unread Alerts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="alert-card p-3 text-center">
+                    <div class="display-6 fw-bold text-danger" id="criticalAlerts">0</div>
+                    <div class="text-muted">Critical Alerts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="alert-card p-3 text-center">
+                    <div class="display-6 fw-bold text-info" id="todayAlerts">0</div>
+                    <div class="text-muted">Today's Alerts</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alert Filters -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert-card p-3">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Severity</label>
+                            <select class="form-select bg-dark text-light" id="severityFilter">
+                                <option value="">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                                <option value="info">Info</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select bg-dark text-light" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="unread">Unread Only</option>
+                                <option value="read">Read Only</option>
+                                <option value="acknowledged">Acknowledged</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Alert Type</label>
+                            <input type="text" class="form-control bg-dark text-light" id="typeFilter" placeholder="Filter by type">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid gap-2 d-md-flex">
+                                <button class="btn btn-primary me-md-2" onclick="applyFilters()">
+                                    <i class="fas fa-filter me-1"></i> Filter
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times me-1"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alerts List -->
+        <div class="row">
+            <div class="col-12">
+                <div id="alertsContainer">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Loading security alerts...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert Details Modal -->
+    <div class="modal fade" id="alertDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">Alert Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="alertDetailsContent">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="acknowledgeAlertFromModal()">
+                        <i class="fas fa-check me-1"></i> Acknowledge
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentAlerts = [];
+        let currentFilters = {};
+        
+        async function loadAlerts() {
+            try {
+                const response = await fetch('/api/alerts');
+                currentAlerts = await response.json();
+                
+                // Calculate statistics
+                const total = currentAlerts.length;
+                const unread = currentAlerts.filter(a => !a.read).length;
+                const critical = currentAlerts.filter(a => a.severity === 'critical').length;
+                const today = currentAlerts.filter(a => {
+                    const alertDate = new Date(a.created_at);
+                    const today = new Date();
+                    return alertDate.toDateString() === today.toDateString();
+                }).length;
+                
+                // Update statistics
+                document.getElementById('totalAlerts').textContent = total;
+                document.getElementById('unreadAlerts').textContent = unread;
+                document.getElementById('criticalAlerts').textContent = critical;
+                document.getElementById('todayAlerts').textContent = today;
+                
+                // Apply filters and display alerts
+                displayAlerts();
+                
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+                document.getElementById('alertsContainer').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Error loading alerts: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function displayAlerts() {
+            let filteredAlerts = [...currentAlerts];
+            
+            // Apply severity filter
+            if (currentFilters.severity) {
+                filteredAlerts = filteredAlerts.filter(a => a.severity === currentFilters.severity);
+            }
+            
+            // Apply status filter
+            if (currentFilters.status === 'unread') {
+                filteredAlerts = filteredAlerts.filter(a => !a.read);
+            } else if (currentFilters.status === 'read') {
+                filteredAlerts = filteredAlerts.filter(a => a.read);
+            } else if (currentFilters.status === 'acknowledged') {
+                filteredAlerts = filteredAlerts.filter(a => a.acknowledged);
+            }
+            
+            // Apply type filter
+            if (currentFilters.type) {
+                filteredAlerts = filteredAlerts.filter(a => 
+                    a.alert_type.toLowerCase().includes(currentFilters.type.toLowerCase())
+                );
+            }
+            
+            // Sort by date (newest first)
+            filteredAlerts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            
+            // Display alerts
+            let alertsHTML = '';
+            
+            if (filteredAlerts.length > 0) {
+                filteredAlerts.forEach(alert => {
+                    const time = new Date(alert.created_at).toLocaleString();
+                    const severityClass = `severity-${alert.severity}`;
+                    const readClass = alert.read ? 'read' : '';
+                    
+                    alertsHTML += `
+                        <div class="alert-card p-3 ${readClass}" id="alert-${alert.id}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong class="me-2">${alert.message}</strong>
+                                    <span class="severity-badge ${severityClass}">${alert.severity}</span>
+                                    ${alert.acknowledged ? '<span class="badge bg-success ms-2">Acknowledged</span>' : ''}
+                                </div>
+                                <small class="text-muted">${time}</small>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-9">
+                                    <small>
+                                        <i class="fas fa-tag me-1"></i> Type: ${alert.alert_type}
+                                    </small>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <button class="btn btn-sm btn-outline-info" onclick="viewAlertDetails(${alert.id})">
+                                        <i class="fas fa-eye me-1"></i> Details
+                                    </button>
+                                    ${!alert.acknowledged ? `
+                                        <button class="btn btn-sm btn-outline-success ms-1" onclick="acknowledgeAlert(${alert.id})">
+                                            <i class="fas fa-check me-1"></i> Ack
+                                        </button>
+                                    ` : ''}
+                                    ${!alert.read ? `
+                                        <button class="btn btn-sm btn-outline-warning ms-1" onclick="markAsRead(${alert.id})">
+                                            <i class="fas fa-envelope-open me-1"></i> Read
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                alertsHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-bell-slash"></i>
+                        <h4 class="text-muted">No Alerts Found</h4>
+                        <p class="text-muted">No security alerts match your filters</p>
+                        <button class="btn btn-outline-light" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i> Clear Filters
+                        </button>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('alertsContainer').innerHTML = alertsHTML;
+        }
+        
+        function applyFilters() {
+            currentFilters = {
+                severity: document.getElementById('severityFilter').value,
+                status: document.getElementById('statusFilter').value,
+                type: document.getElementById('typeFilter').value
+            };
+            
+            displayAlerts();
+        }
+        
+        function clearFilters() {
+            document.getElementById('severityFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('typeFilter').value = '';
+            currentFilters = {};
+            displayAlerts();
+        }
+        
+        async function viewAlertDetails(alertId) {
+            try {
+                const alert = currentAlerts.find(a => a.id === alertId);
+                
+                if (alert) {
+                    const details = JSON.parse(alert.details || '{}');
+                    const modal = new bootstrap.Modal(document.getElementById('alertDetailsModal'));
+                    
+                    let detailsHTML = `
+                        <div class="mb-3">
+                            <strong>Message:</strong> ${alert.message}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Severity:</strong> <span class="severity-badge severity-${alert.severity}">${alert.severity}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Type:</strong> ${alert.alert_type}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Created:</strong> ${new Date(alert.created_at).toLocaleString()}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Status:</strong> 
+                            ${alert.acknowledged ? '<span class="badge bg-success">Acknowledged</span>' : '<span class="badge bg-warning">Pending</span>'}
+                            ${alert.read ? '<span class="badge bg-info ms-2">Read</span>' : '<span class="badge bg-secondary ms-2">Unread</span>'}
+                        </div>
+                    `;
+                    
+                    if (Object.keys(details).length > 0) {
+                        detailsHTML += `
+                            <div class="mt-3">
+                                <strong>Details:</strong>
+                                <div class="alert-details">
+                                    ${JSON.stringify(details, null, 2)}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    document.getElementById('alertDetailsContent').innerHTML = detailsHTML;
+                    modal.show();
+                }
+            } catch (error) {
+                console.error('Error viewing alert details:', error);
+                alert('Failed to load alert details');
+            }
+        }
+        
+        async function acknowledgeAlert(alertId) {
+            try {
+                const response = await fetch(`/api/acknowledge_alert/${alertId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // Update UI
+                    const alertElement = document.getElementById(`alert-${alertId}`);
+                    if (alertElement) {
+                        alertElement.querySelector('.severity-badge').insertAdjacentHTML('afterend', 
+                            '<span class="badge bg-success ms-2">Acknowledged</span>');
+                        
+                        // Remove acknowledge button
+                        const ackButton = alertElement.querySelector('button.btn-outline-success');
+                        if (ackButton) {
+                            ackButton.remove();
+                        }
+                    }
+                    
+                    // Reload alerts
+                    loadAlerts();
+                }
+            } catch (error) {
+                console.error('Error acknowledging alert:', error);
+                alert('Failed to acknowledge alert');
+            }
+        }
+        
+        async function acknowledgeAlertFromModal() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('alertDetailsModal'));
+            const content = document.getElementById('alertDetailsContent');
+            const message = content.querySelector('strong').nextSibling.textContent.trim();
+            const alert = currentAlerts.find(a => a.message === message);
+            
+            if (alert) {
+                modal.hide();
+                await acknowledgeAlert(alert.id);
+            }
+        }
+        
+        async function markAsRead(alertId) {
+            try {
+                // In a real implementation, you would call an API endpoint
+                // For now, we'll update the UI directly
+                const alertElement = document.getElementById(`alert-${alertId}`);
+                if (alertElement) {
+                    alertElement.classList.add('read');
+                    
+                    // Remove mark as read button
+                    const readButton = alertElement.querySelector('button.btn-outline-warning');
+                    if (readButton) {
+                        readButton.remove();
+                    }
+                }
+                
+                // Reload statistics
+                loadAlerts();
+                
+            } catch (error) {
+                console.error('Error marking alert as read:', error);
+            }
+        }
+        
+        async function clearReadAlerts() {
+            if (confirm('Clear all read alerts? This action cannot be undone.')) {
+                try {
+                    // In a real implementation, you would call an API endpoint
+                    // For now, we'll just reload the page
+                    alert('This feature would delete read alerts in a real implementation');
+                } catch (error) {
+                    console.error('Error clearing read alerts:', error);
+                    alert('Failed to clear read alerts');
+                }
+            }
+        }
+        
+        function refreshAlerts() {
+            loadAlerts();
+        }
+        
+        // Auto-refresh alerts every 30 seconds
+        setInterval(loadAlerts, 30000);
+        
+        // Initial load
+        loadAlerts();
+    </script>
+</body>
+</html>
+=======
+    <title>Quorra SIEM - Alerts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+        .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px;}
+
+        .sev{padding:2px 8px;border-radius:99px;font-size:.68rem;font-weight:600;display:inline-block;}
+        .sev-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+        .sev-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+        .sev-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+        .sev-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+        .sev-info{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        .alert-card{border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid transparent;transition:.2s;background:rgba(255,255,255,.03);border-top:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);}
+        .alert-card:hover{background:rgba(255,255,255,.05);}
+        .alert-card.unread{background:rgba(99,102,241,.04);}
+        .alert-card.al-critical{border-left-color:#ef4444;}
+        .alert-card.al-high{border-left-color:#f97316;}
+        .alert-card.al-medium{border-left-color:#eab308;}
+        .alert-card.al-low{border-left-color:#22c55e;}
+        .alert-card.al-info{border-left-color:#6b7280;}
+        .alert-card.read{opacity:.55;}
+
+        .risk-bar{height:4px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:5px;}
+        .risk-bar-fill{height:100%;border-radius:99px;}
+
+        .ml-tag{font-size:.63rem;padding:1px 6px;border-radius:99px;margin-right:3px;margin-bottom:2px;display:inline-block;}
+        .ml-anomaly{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);}
+        .ml-ueba{background:rgba(168,85,247,.15);color:#d8b4fe;border:1px solid rgba(168,85,247,.3);}
+        .ml-lstm{background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(59,130,246,.3);}
+        .ml-novel{background:rgba(234,179,8,.15);color:#fde68a;border:1px solid rgba(234,179,8,.3);}
+        .ml-chain{background:rgba(239,68,68,.25);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+        .ml-mitre{background:rgba(99,102,241,.15);color:#c7d2fe;border:1px solid rgba(99,102,241,.3);}
+
+        .risk-score-badge{font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:8px;display:inline-block;}
+        .rsb-critical{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+        .rsb-high{background:rgba(249,115,22,.15);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+        .rsb-medium{background:rgba(234,179,8,.15);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+        .rsb-low{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+        .rsb-info{background:rgba(107,114,128,.15);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        .sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:10px;font-weight:600;}
+        .stat-num{font-size:2rem;font-weight:700;line-height:1;}
+        code{color:#a78bfa;background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px;font-size:.78rem;}
+        .live-badge{animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .form-select,.form-control{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+        .form-select option{background:#1f2937;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+            <a class="nav-link px-2" href="/logs">Logs</a>
+            <a class="nav-link px-2" href="/attacks">Attacks</a>
+            <a class="nav-link active px-2" href="/alerts">Alerts</a>
+            <a class="nav-link px-2" href="/blocklist">Blocklist</a>
+            <a class="nav-link px-2" href="/rules"><i class="fas fa-sliders-h me-1"></i>Rules</a>
+            <a class="nav-link px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0">Security Alerts</h1>
+            <p class="text-secondary mb-0" style="font-size:.8rem">ML-generated alerts show risk score, MITRE tactic, signal breakdown and attack chains</p>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadAlerts()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-danger"  id="critCount">—</div><div class="sec-head mt-1 mb-0">Critical</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-warning" id="unreadCount">—</div><div class="sec-head mt-1 mb-0">Unread</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num" style="color:#a78bfa" id="mlAlertCount">—</div><div class="sec-head mt-1 mb-0">ML-Generated</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-secondary" id="totalCount">—</div><div class="sec-head mt-1 mb-0">Total</div></div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="g-card py-3 px-4 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">Severity</label>
+                <select class="form-select form-select-sm" id="sevFilter">
+                    <option value="">All</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">Source</label>
+                <select class="form-select form-select-sm" id="srcFilter">
+                    <option value="">All</option>
+                    <option value="ml">ML-Generated</option>
+                    <option value="rule">Rule-Based</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">Status</label>
+                <select class="form-select form-select-sm" id="statusFilter">
+                    <option value="">All</option>
+                    <option value="unread">Unread</option>
+                    <option value="ack">Acknowledged</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="sec-head d-block">Type / search</label>
+                <input type="text" class="form-control form-control-sm" id="typeFilter" placeholder="e.g. bruteforce">
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-2">
+                <button class="btn btn-sm btn-primary flex-fill" onclick="applyFilters()"><i class="fas fa-filter me-1"></i>Filter</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert list -->
+    <div id="alertsContainer"><div class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</div></div>
+</div>
+
+<!-- Alert detail modal -->
+<div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+                <h5 class="modal-title"><i class="fas fa-bell me-2" style="color:#a78bfa"></i>Alert + ML Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="alertModalBody"></div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-sm btn-success" id="alertAckBtn"><i class="fas fa-check me-1"></i>Acknowledge</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let allAlerts=[], filteredAlerts=[];
+
+function rc(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
+function bc(c){return c==='critical'?'#ef4444':c==='high'?'#f97316':c==='medium'?'#eab308':'#22c55e';}
+
+function buildTags(det) {
+    const tags=[];
+    if (!det) return '';
+    const flags = det.flags||[];
+    if (flags.includes('anomaly'))            tags.push('<span class="ml-tag ml-anomaly">anomaly</span>');
+    if (flags.includes('UEBA'))               tags.push('<span class="ml-tag ml-ueba">UEBA</span>');
+    if (flags.includes('sequential-pattern')) tags.push('<span class="ml-tag ml-lstm">LSTM</span>');
+    if (flags.includes('novel-log'))          tags.push('<span class="ml-tag ml-novel">novel</span>');
+    (det.chains||[]).forEach(c=>tags.push(`<span class="ml-tag ml-chain">[chain]${c}</span>`));
+    if (det.mitre_tactic && det.mitre_tactic!=='N/A') tags.push(`<span class="ml-tag ml-mitre">${det.mitre_tactic.split(' ')[0]}</span>`);
+    return tags.join('');
+}
+
+async function loadAlerts() {
+    try {
+        const res = await fetch('/api/alerts');
+        allAlerts = await res.json();
+
+        const today = new Date().toDateString();
+        const mlAlerts = allAlerts.filter(a=>(a.alert_type||'').startsWith('ML:'));
+        document.getElementById('critCount').textContent    = allAlerts.filter(a=>a.severity==='critical').length;
+        document.getElementById('unreadCount').textContent  = allAlerts.filter(a=>!a.is_read).length;
+        document.getElementById('mlAlertCount').textContent = mlAlerts.length;
+        document.getElementById('totalCount').textContent   = allAlerts.length;
+
+        applyFilters();
+    } catch(e) {
+        document.getElementById('alertsContainer').innerHTML=`<div class="text-danger text-center py-4">Error: ${e.message}</div>`;
+    }
+}
+
+function applyFilters() {
+    const sev    = document.getElementById('sevFilter').value;
+    const src    = document.getElementById('srcFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const type   = document.getElementById('typeFilter').value.toLowerCase();
+
+    filteredAlerts = allAlerts.filter(a => {
+        if (sev && a.severity !== sev) return false;
+        if (src==='ml'   && !(a.alert_type||'').startsWith('ML:')) return false;
+        if (src==='rule' &&  (a.alert_type||'').startsWith('ML:')) return false;
+        if (status==='unread' && a.is_read) return false;
+        if (status==='ack' && !a.acknowledged) return false;
+        if (type && !(a.message||'').toLowerCase().includes(type) && !(a.alert_type||'').toLowerCase().includes(type)) return false;
+        return true;
+    }).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+    renderAlerts();
+}
+
+function clearFilters() {
+    ['sevFilter','srcFilter','statusFilter','typeFilter'].forEach(id=>document.getElementById(id).value='');
+    applyFilters();
+}
+
+function renderAlerts() {
+    if (!filteredAlerts.length) {
+        document.getElementById('alertsContainer').innerHTML=`
+        <div class="text-center py-5 text-secondary">
+            <i class="fas fa-bell-slash fa-3x mb-3 d-block" style="opacity:.3"></i>
+            <h5>No alerts match your filters</h5>
+        </div>`;
+        return;
+    }
+
+    document.getElementById('alertsContainer').innerHTML = filteredAlerts.map(a => {
+        let det={}; try{det=JSON.parse(a.details||'{}');}catch(e){}
+        const rs   = det.risk_score||null;
+        const isML = (a.alert_type||'').startsWith('ML:');
+        const tags = buildTags(det);
+        const bar  = rs!==null ? `<div class="risk-bar"><div class="risk-bar-fill" style="width:${rs}%;background:${bc(rc(rs))}"></div></div>` : '';
+
+        return `
+        <div class="alert-card al-${a.severity} ${!a.is_read?'unread':''} ${a.is_read?'read':''}" onclick="viewAlert(${a.id})" style="cursor:pointer">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div class="flex-fill">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="fw-bold" style="font-size:.88rem">${a.message.substring(0,80)}${a.message.length>80?'…':''}</span>
+                        <span class="sev sev-${a.severity}">${a.severity}</span>
+                        ${isML ? '<span style="font-size:.62rem;color:#a78bfa;border:1px solid rgba(167,139,250,.4);padding:1px 5px;border-radius:4px">ML</span>' : ''}
+                        ${a.acknowledged ? '<span style="font-size:.62rem;color:#86efac;border:1px solid rgba(34,197,94,.4);padding:1px 5px;border-radius:4px">Acked</span>' : ''}
+                    </div>
+                    <div style="font-size:.75rem;color:#9ca3af" class="mb-1">
+                        <i class="fas fa-tag me-1"></i>${a.alert_type||'N/A'}
+                        ${det.source_ip?` &nbsp;·&nbsp; <code>${det.source_ip}</code>`:''}
+                        ${rs!==null?` &nbsp;·&nbsp; <span class="rsb-${rc(rs)} risk-score-badge">Risk ${rs}</span>`:''}
+                        ${det.mitre_tactic && det.mitre_tactic!=='N/A'?` &nbsp;·&nbsp; <span class="ml-tag ml-mitre">${det.mitre_tactic.split(' ')[0]}</span>`:''}
+                    </div>
+                    ${bar}
+                    ${tags ? `<div class="mt-1">${tags}</div>` : ''}
+                </div>
+                <div class="text-end flex-shrink-0">
+                    <div style="font-size:.72rem;color:#6b7280;white-space:nowrap">${new Date(a.created_at).toLocaleString()}</div>
+                    <div class="mt-2 d-flex gap-1 justify-content-end">
+                        ${!a.acknowledged?`<button class="btn btn-sm btn-outline-success p-1 px-2" onclick="event.stopPropagation();ackAlert(${a.id})" style="font-size:.68rem"><i class="fas fa-check me-1"></i>Ack</button>`:''}
+                        ${!a.is_read?`<button class="btn btn-sm btn-outline-secondary p-1 px-2" onclick="event.stopPropagation();markRead(${a.id})" style="font-size:.68rem">Read</button>`:''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function viewAlert(id) {
+    const a = allAlerts.find(x=>x.id===id);
+    if (!a) return;
+    let det={}; try{det=JSON.parse(a.details||'{}');}catch(e){}
+    const rs  = det.risk_score||null;
+    const tags = buildTags(det);
+    const sb  = det.signal_breakdown||null;
+    const sbHTML = sb ? `<p class="sec-head mt-3">Signal Breakdown</p><div class="row g-2">${Object.entries(sb).map(([k,v])=>`<div class="col-6"><div style="font-size:.7rem;color:#9ca3af;text-transform:capitalize">${k}</div><div style="height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden"><div style="height:100%;width:${v}%;background:#a78bfa"></div></div><span style="font-size:.7rem;color:#a78bfa">${v}</span></div>`).join('')}</div>` : '';
+
+    document.getElementById('alertModalBody').innerHTML=`
+    <div class="row g-3">
+        <div class="col-md-5">
+            <p class="sec-head">Alert Info</p>
+            <div class="mb-2"><span class="sev sev-${a.severity} me-2">${a.severity}</span>${(a.alert_type||'').startsWith('ML:')?'<span style="font-size:.7rem;color:#a78bfa;border:1px solid rgba(167,139,250,.4);padding:1px 6px;border-radius:4px">ML-Generated</span>':''}</div>
+            <p style="font-size:.85rem">${a.message}</p>
+            <table class="table table-sm" style="color:#e5e7eb;font-size:.8rem">
+                <tr><td class="text-secondary">Type</td><td>${a.alert_type}</td></tr>
+                <tr><td class="text-secondary">Created</td><td>${new Date(a.created_at).toLocaleString()}</td></tr>
+                <tr><td class="text-secondary">Status</td><td>${a.acknowledged?'<span style="color:#86efac">Acknowledged</span>':'<span style="color:#9ca3af">Pending</span>'} &nbsp; ${a.is_read?'Read':'Unread'}</td></tr>
+                ${det.source_ip?`<tr><td class="text-secondary">Source IP</td><td><code>${det.source_ip}</code></td></tr>`:''}
+            </table>
+        </div>
+        <div class="col-md-7">
+            <p class="sec-head">ML Intelligence</p>
+            ${rs!==null?`
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div style="font-size:2.2rem;font-weight:700;color:${bc(rc(rs))}">${rs}<span style="font-size:.9rem;color:#6b7280">/100</span></div>
+                <div>
+                    <div style="font-size:.85rem;font-weight:700;color:${bc(rc(rs))}">${rc(rs).toUpperCase()} RISK</div>
+                    ${det.threat_label?`<div style="font-size:.78rem;color:#a78bfa">${det.threat_label}</div>`:''}
+                    ${det.mitre_tactic&&det.mitre_tactic!=='N/A'?`<div style="font-size:.72rem;color:#818cf8">${det.mitre_tactic}</div>`:''}
+                </div>
+            </div>`:'<p class="text-secondary small">No ML score — rule-based alert.</p>'}
+            <div class="mb-2">${tags||'<span class="text-secondary small">No ML flags</span>'}</div>
+            ${(det.chains||[]).length?`<p class="sec-head mt-2">Attack Chains</p>${det.chains.map(c=>`<div class="mb-1 small">[chain]${c}</div>`).join('')}`:''}
+            ${sbHTML}
+        </div>
+    </div>`;
+
+    document.getElementById('alertAckBtn').onclick = async () => {
+        await ackAlert(a.id);
+        bootstrap.Modal.getInstance(document.getElementById('alertModal')).hide();
+    };
+    new bootstrap.Modal(document.getElementById('alertModal')).show();
+}
+
+async function ackAlert(id) {
+    await fetch(`/api/acknowledge_alert/${id}`,{method:'POST'});
+    loadAlerts();
+}
+
+async function markRead(id) {
+    await fetch(`/api/mark_read/${id}`,{method:'POST'});
+    loadAlerts();
+}
+
+function rc(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
+function bc(c){return c==='critical'?'#ef4444':c==='high'?'#f97316':c==='medium'?'#eab308':'#22c55e';}
+
+setInterval(loadAlerts, 30000);
+loadAlerts();
+</script>
+</body>
+</html>
+>>>>>>> cea6978 (Reconnected project and updated files)

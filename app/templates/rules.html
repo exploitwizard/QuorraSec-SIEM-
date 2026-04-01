@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quorra SIEM - Rule Builder</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" rel="stylesheet">
+    <style>
+        body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+        .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px;}
+
+        .sev{padding:2px 8px;border-radius:99px;font-size:.68rem;font-weight:600;display:inline-block;}
+        .sev-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+        .sev-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+        .sev-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+        .sev-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+        .sev-info{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        .sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:8px;font-weight:600;}
+        code{color:#a78bfa;background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px;font-size:.78rem;}
+        .form-select,.form-control{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+        .form-select option{background:#1f2937;}
+
+        /* Tabs */
+        .level-tabs .nav-link{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)!important;color:#9ca3af!important;border-radius:10px!important;margin-right:6px;padding:6px 18px;font-size:.82rem;}
+        .level-tabs .nav-link.active{background:rgba(167,139,250,.15)!important;color:#a78bfa!important;border-color:rgba(167,139,250,.4)!important;}
+
+        /* Condition rows */
+        .condition-row{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;gap:8px;align-items:center;}
+        .condition-row select,.condition-row input{flex:1;min-width:0;}
+        .btn-remove-cond{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:2px 8px;border-radius:6px;font-size:.75rem;white-space:nowrap;}
+        .btn-remove-cond:hover{background:rgba(239,68,68,.25);}
+        .logic-badge{padding:2px 10px;border-radius:99px;font-size:.7rem;font-weight:700;cursor:pointer;user-select:none;border:1px solid rgba(167,139,250,.4);color:#a78bfa;background:rgba(167,139,250,.1);}
+        .logic-badge.or{border-color:rgba(249,115,22,.4);color:#fdba74;background:rgba(249,115,22,.1);}
+
+        /* Rules table */
+        .rules-table td,.rules-table th{font-size:.8rem;vertical-align:middle;border-color:rgba(255,255,255,.06)!important;color:#e5e7eb;}
+        .rules-table th{color:#9ca3af;font-weight:600;text-transform:uppercase;font-size:.68rem;letter-spacing:.05em;}
+        .rules-table{--bs-table-bg:transparent!important;}
+        .rules-table tr:hover td{background:rgba(255,255,255,.03);}
+        .level-badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:.65rem;font-weight:700;}
+        .level-1{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.3);}
+        .level-2{background:rgba(99,102,241,.15);color:#c7d2fe;border:1px solid rgba(99,102,241,.3);}
+        .level-3{background:rgba(249,115,22,.15);color:#fdba74;border:1px solid rgba(249,115,22,.3);}
+
+        /* CodeMirror overrides */
+        .CodeMirror{height:300px;border-radius:8px;font-size:.83rem;border:1px solid rgba(255,255,255,.1);}
+        .CodeMirror-scroll{padding:4px;}
+
+        /* Toggle switch */
+        .form-switch .form-check-input{width:2em;cursor:pointer;}
+        .form-check-input:checked{background-color:#a78bfa;border-color:#a78bfa;}
+
+        /* Test result */
+        .test-triggered{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:8px;padding:10px 14px;color:#fca5a5;}
+        .test-clean{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:10px 14px;color:#86efac;}
+        .test-error{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:10px 14px;color:#fde68a;}
+
+        .live-badge{animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+        .hint-block{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#c7d2fe;margin-bottom:12px;}
+        .warn-block{background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fdba74;margin-bottom:12px;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+            <a class="nav-link px-2" href="/logs">Logs</a>
+            <a class="nav-link px-2" href="/attacks">Attacks</a>
+            <a class="nav-link px-2" href="/alerts">Alerts</a>
+            <a class="nav-link px-2" href="/blocklist">Blocklist</a>
+            <a class="nav-link active px-2" href="/rules"><i class="fas fa-sliders-h me-1"></i>Rules</a>
+            <a class="nav-link px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0"><i class="fas fa-sliders-h me-2" style="color:#a78bfa"></i>Rule Builder</h1>
+            <p class="text-secondary mb-0" style="font-size:.8rem">Create detection rules at any skill level — visual, YAML, or Python DSL</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadRules()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+            <button class="btn btn-sm" style="background:#a78bfa;color:#0d0d1a;font-weight:600" onclick="openCreateModal()"><i class="fas fa-plus me-1"></i>New Rule</button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Left: Rules List -->
+        <div class="col-12 col-xl-8">
+            <div class="g-card p-0" style="overflow:hidden">
+                <div class="px-4 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                    <span class="sec-head mb-0">Active Rules</span>
+                    <span id="ruleCount" class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;font-size:.72rem">0 rules</span>
+                </div>
+                <div style="overflow-x:auto">
+                    <table class="table rules-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Name</th>
+                                <th>Level</th>
+                                <th>Severity</th>
+                                <th>Action</th>
+                                <th>Triggers</th>
+                                <th>Enabled</th>
+                                <th class="pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rulesTableBody">
+                            <tr><td colspan="7" class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Stats -->
+        <div class="col-12 col-xl-4">
+            <div class="g-card mb-3">
+                <p class="sec-head">Rule Stats</p>
+                <div class="row g-2 text-center">
+                    <div class="col-6"><div style="font-size:1.6rem;font-weight:700;color:#86efac" id="statEnabled">—</div><div class="sec-head mb-0">Enabled</div></div>
+                    <div class="col-6"><div style="font-size:1.6rem;font-weight:700;color:#9ca3af" id="statDisabled">—</div><div class="sec-head mb-0">Disabled</div></div>
+                    <div class="col-4"><div style="font-size:1.2rem;font-weight:700;color:#86efac" id="statL1">—</div><div class="sec-head mb-0">Visual</div></div>
+                    <div class="col-4"><div style="font-size:1.2rem;font-weight:700;color:#c7d2fe" id="statL2">—</div><div class="sec-head mb-0">YAML</div></div>
+                    <div class="col-4"><div style="font-size:1.2rem;font-weight:700;color:#fdba74" id="statL3">—</div><div class="sec-head mb-0">Python</div></div>
+                </div>
+            </div>
+            <div class="g-card">
+                <p class="sec-head">Level Guide</p>
+                <div class="mb-2"><span class="level-badge level-1 me-2">L1</span><span style="font-size:.8rem">Visual Builder — no code needed. Pick fields, operators, values.</span></div>
+                <div class="mb-2"><span class="level-badge level-2 me-2">L2</span><span style="font-size:.8rem">YAML / JSON — structured syntax with temporal operators.</span></div>
+                <div><span class="level-badge level-3 me-2">L3</span><span style="font-size:.8rem">Python DSL — full scripting power, sandboxed execution.</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     CREATE / EDIT MODAL
+     ============================================================ -->
+<div class="modal fade" id="ruleModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+                <h5 class="modal-title" id="ruleModalTitle"><i class="fas fa-sliders-h me-2" style="color:#a78bfa"></i>New Rule</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Common fields row -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="sec-head d-block">Rule Name *</label>
+                        <input type="text" class="form-control form-control-sm" id="ruleNameInput" placeholder="e.g. Brute-force SSH">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="sec-head d-block">Description</label>
+                        <input type="text" class="form-control form-control-sm" id="ruleDescInput" placeholder="Optional">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="sec-head d-block">MITRE Tactic</label>
+                        <select class="form-select form-select-sm" id="ruleMitreInput">
+                            <option value="">— None —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="sec-head d-block">Severity</label>
+                        <select class="form-select form-select-sm" id="ruleSevInput">
+                            <option value="info">Info</option>
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="sec-head d-block">Action</label>
+                        <select class="form-select form-select-sm" id="ruleActionInput">
+                            <option value="alert" selected>Alert</option>
+                            <option value="block">Block</option>
+                            <option value="alert_and_block">Alert + Block</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div class="form-check form-switch ms-1 mb-1">
+                            <input class="form-check-input" type="checkbox" id="ruleBlockIp">
+                            <label class="form-check-label" for="ruleBlockIp" style="font-size:.82rem">Auto-block IP</label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border-color:rgba(255,255,255,.1)">
+
+                <!-- Level tabs -->
+                <ul class="nav level-tabs mb-3" id="levelTabsNav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="selectLevel(1,this);return false">
+                            <i class="fas fa-paint-brush me-1"></i>Level 1 — Visual
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="selectLevel(2,this);return false">
+                            <i class="fas fa-code me-1"></i>Level 2 — YAML
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="selectLevel(3,this);return false">
+                            <i class="fab fa-python me-1"></i>Level 3 — Python DSL
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Level 1: Visual Builder -->
+                <div id="panelLevel1">
+                    <div class="hint-block"><i class="fas fa-info-circle me-1"></i> Add conditions below. All conditions must match (AND) or any one (OR). Values are case-insensitive text comparisons unless you pick a numeric or temporal operator.</div>
+
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span style="font-size:.82rem;color:#9ca3af">Conditions logic:</span>
+                        <span class="logic-badge" id="logicBadge" onclick="toggleLogic()">AND</span>
+                    </div>
+
+                    <div id="conditionsContainer"></div>
+
+                    <button class="btn btn-sm btn-outline-secondary mt-1" onclick="addConditionRow()"><i class="fas fa-plus me-1"></i>Add Condition</button>
+                </div>
+
+                <!-- Level 2: YAML editor -->
+                <div id="panelLevel2" style="display:none">
+                    <div class="hint-block">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Write a YAML rule. Required keys: <code>rule_name</code>, <code>conditions</code> (list of <code>{field, operator, value}</code>), optional <code>logic</code> (AND/OR), <code>temporal</code> (count_within / unique_count_within / rate_within).<br>
+                        <strong>Temporal example:</strong> <code>temporal: {operator: count_within, field: ip_address, window_seconds: 60, threshold: 5}</code>
+                    </div>
+                    <textarea id="yamlEditorEl"></textarea>
+                </div>
+
+                <!-- Level 3: Python DSL -->
+                <div id="panelLevel3" style="display:none">
+                    <div class="warn-block"><i class="fas fa-exclamation-triangle me-1"></i> Python code runs in a <strong>RestrictedPython</strong> sandbox. No file I/O, no network calls, no imports beyond <code>re</code> and <code>json</code>. The function must accept <code>event</code> (dict) and return <code>True</code> to trigger the rule.</div>
+                    <div id="sandboxWarning" class="warn-block d-none" style="border-color:rgba(239,68,68,.3);color:#fca5a5"><i class="fas fa-exclamation-circle me-1"></i>RestrictedPython not installed — code runs in a basic sandbox. Install it: <code>pip install RestrictedPython</code></div>
+                    <textarea id="pythonEditorEl"></textarea>
+                </div>
+
+                <!-- Save error -->
+                <div id="saveError" class="test-error mt-3 d-none"></div>
+            </div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm" style="background:#a78bfa;color:#0d0d1a;font-weight:600" id="saveRuleBtn" onclick="saveRule()"><i class="fas fa-save me-1"></i>Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     TEST MODAL
+     ============================================================ -->
+<div class="modal fade" id="testModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+                <h5 class="modal-title"><i class="fas fa-flask me-2" style="color:#a78bfa"></i>Test Rule</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="sec-head">Sample Event (JSON) — leave blank to use most recent log entry</p>
+                <textarea id="testEventInput" class="form-control mb-3" rows="6" style="font-family:monospace;font-size:.8rem" placeholder='{"ip_address":"1.2.3.4","attack_type":"SQL Injection Attempt","endpoint":"/api/login","payload":"OR 1=1","severity":"high","user_agent":"curl/7.68"}'></textarea>
+                <button class="btn btn-sm btn-primary" onclick="runTest()"><i class="fas fa-play me-1"></i>Run Test</button>
+                <div id="testResult" class="mt-3"></div>
+            </div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let schema = { fields:[], simple_operators:[], temporal_operators:[], mitre_tactics:[], severities:[], actions:[], dsl_template:'', restricted_python_available:false };
+let rules = [];
+let currentLevel = 1;
+let editingRuleId = null;
+let testingRuleId = null;
+let condLogic = 'AND';
+
+// CodeMirror instances
+let yamlEditor = null;
+let pyEditor   = null;
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadSchema();
+    await loadRules();
+    initEditors();
+});
+
+async function loadSchema() {
+    try {
+        const res = await fetch('/api/rules/schema');
+        schema = await res.json();
+        populateMitreSelect(document.getElementById('ruleMitreInput'));
+        if (!schema.restricted_python_available) {
+            document.getElementById('sandboxWarning').classList.remove('d-none');
+        }
+    } catch(e) { console.error('schema load failed', e); }
+}
+
+function populateMitreSelect(sel) {
+    sel.innerHTML = '<option value="">— None —</option>';
+    (schema.mitre_tactics || []).forEach(t => {
+        const o = document.createElement('option');
+        o.value = t; o.textContent = t;
+        sel.appendChild(o);
+    });
+}
+
+function initEditors() {
+    yamlEditor = CodeMirror.fromTextArea(document.getElementById('yamlEditorEl'), {
+        mode: 'yaml', theme: 'dracula', lineNumbers: true, indentUnit: 2, tabSize: 2,
+        lineWrapping: true, autofocus: false,
+    });
+
+    pyEditor = CodeMirror.fromTextArea(document.getElementById('pythonEditorEl'), {
+        mode: 'python', theme: 'dracula', lineNumbers: true, indentUnit: 4, tabSize: 4,
+        lineWrapping: true, autofocus: false,
+    });
+}
+
+// ── Rules List ────────────────────────────────────────────────────────────────
+async function loadRules() {
+    try {
+        const res = await fetch('/api/rules');
+        rules = await res.json();
+        renderRules();
+        updateStats();
+    } catch(e) {
+        document.getElementById('rulesTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function updateStats() {
+    document.getElementById('ruleCount').textContent = rules.length + ' rule' + (rules.length!==1?'s':'');
+    document.getElementById('statEnabled').textContent  = rules.filter(r=>r.enabled).length;
+    document.getElementById('statDisabled').textContent = rules.filter(r=>!r.enabled).length;
+    document.getElementById('statL1').textContent = rules.filter(r=>r.level===1).length;
+    document.getElementById('statL2').textContent = rules.filter(r=>r.level===2).length;
+    document.getElementById('statL3').textContent = rules.filter(r=>r.level===3).length;
+}
+
+function renderRules() {
+    if (!rules.length) {
+        document.getElementById('rulesTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-5 text-secondary"><i class="fas fa-sliders-h fa-2x mb-3 d-block" style="opacity:.3"></i>No rules yet — create your first rule above.</td></tr>`;
+        return;
+    }
+    document.getElementById('rulesTableBody').innerHTML = rules.map(r => `
+        <tr>
+            <td class="ps-4">
+                <div style="font-weight:600;font-size:.84rem">${esc(r.name)}</div>
+                ${r.description ? `<div style="font-size:.72rem;color:#6b7280">${esc(r.description)}</div>` : ''}
+                ${r.mitre_tactic ? `<span style="font-size:.63rem;color:#c7d2fe;border:1px solid rgba(99,102,241,.3);padding:1px 5px;border-radius:4px">${esc(r.mitre_tactic.split(' ')[0])}</span>` : ''}
+            </td>
+            <td><span class="level-badge level-${r.level}">L${r.level} ${r.level===1?'Visual':r.level===2?'YAML':'Python'}</span></td>
+            <td><span class="sev sev-${r.severity}">${r.severity}</span></td>
+            <td style="font-size:.75rem;color:#9ca3af">${r.action||'alert'}</td>
+            <td style="font-size:.82rem">${r.trigger_count||0}${r.last_triggered?`<div style="font-size:.68rem;color:#6b7280">${new Date(r.last_triggered).toLocaleDateString()}</div>`:''}</td>
+            <td>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" ${r.enabled?'checked':''} onchange="toggleRule(${r.id})">
+                </div>
+            </td>
+            <td class="pe-4">
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary p-1 px-2" onclick="openTestModal(${r.id})" title="Test"><i class="fas fa-flask"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary p-1 px-2" onclick="openEditModal(${r.id})" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger p-1 px-2" onclick="deleteRule(${r.id})" title="Delete"><i class="fas fa-trash"></i></button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+
+// ── CRUD helpers ──────────────────────────────────────────────────────────────
+async function toggleRule(id) {
+    await fetch(`/api/rules/${id}/toggle`, {method:'POST'});
+    await loadRules();
+}
+
+async function deleteRule(id) {
+    const rule = rules.find(r=>r.id===id);
+    if (!confirm(`Delete rule "${rule?.name}"?`)) return;
+    const res = await fetch(`/api/rules/${id}`, {method:'DELETE'});
+    const data = await res.json();
+    if (data.ok) await loadRules();
+    else alert('Delete failed: ' + data.error);
+}
+
+// ── Create / Edit Modal ───────────────────────────────────────────────────────
+function openCreateModal() {
+    editingRuleId = null;
+    document.getElementById('ruleModalTitle').innerHTML = '<i class="fas fa-plus me-2" style="color:#a78bfa"></i>New Rule';
+    document.getElementById('ruleNameInput').value   = '';
+    document.getElementById('ruleDescInput').value   = '';
+    document.getElementById('ruleSevInput').value    = 'medium';
+    document.getElementById('ruleActionInput').value = 'alert';
+    document.getElementById('ruleBlockIp').checked   = false;
+    document.getElementById('ruleMitreInput').value  = '';
+    document.getElementById('saveError').classList.add('d-none');
+    selectLevel(1, document.querySelector('.level-tabs .nav-link'));
+    resetConditions();
+    yamlEditor && yamlEditor.setValue(defaultYaml());
+    pyEditor   && pyEditor.setValue(schema.dsl_template || defaultPython());
+    new bootstrap.Modal(document.getElementById('ruleModal')).show();
+}
+
+function openEditModal(id) {
+    const rule = rules.find(r=>r.id===id);
+    if (!rule) return;
+    editingRuleId = id;
+    document.getElementById('ruleModalTitle').innerHTML = `<i class="fas fa-edit me-2" style="color:#a78bfa"></i>Edit Rule — ${esc(rule.name)}`;
+    document.getElementById('ruleNameInput').value   = rule.name;
+    document.getElementById('ruleDescInput').value   = rule.description||'';
+    document.getElementById('ruleSevInput').value    = rule.severity||'medium';
+    document.getElementById('ruleActionInput').value = rule.action||'alert';
+    document.getElementById('ruleBlockIp').checked   = !!rule.block_ip;
+    document.getElementById('ruleMitreInput').value  = rule.mitre_tactic||'';
+    document.getElementById('saveError').classList.add('d-none');
+
+    // Activate appropriate tab
+    const tabLinks = document.querySelectorAll('.level-tabs .nav-link');
+    const targetTab = tabLinks[rule.level-1];
+    selectLevel(rule.level, targetTab);
+
+    if (rule.level === 1) {
+        loadConditionsFromDef(rule.rule_definition);
+    } else if (rule.level === 2) {
+        const def = rule.rule_definition || '{}';
+        const parsed = typeof def === 'string' ? JSON.parse(def) : def;
+        yamlEditor && yamlEditor.setValue(defToYaml(parsed));
+    } else if (rule.level === 3) {
+        pyEditor && pyEditor.setValue(rule.rule_python||'');
+    }
+
+    new bootstrap.Modal(document.getElementById('ruleModal')).show();
+}
+
+async function saveRule() {
+    const name = document.getElementById('ruleNameInput').value.trim();
+    if (!name) { showSaveError('Rule name is required.'); return; }
+
+    const payload = {
+        name,
+        description: document.getElementById('ruleDescInput').value.trim(),
+        severity:    document.getElementById('ruleSevInput').value,
+        action:      document.getElementById('ruleActionInput').value,
+        block_ip:    document.getElementById('ruleBlockIp').checked,
+        mitre_tactic:document.getElementById('ruleMitreInput').value||null,
+        level:       currentLevel,
+    };
+
+    if (currentLevel === 1) {
+        const def = buildDefFromConditions();
+        if (!def) { showSaveError('Add at least one condition.'); return; }
+        payload.rule_definition = def;
+    } else if (currentLevel === 2) {
+        payload.rule_definition = yamlEditor ? yamlEditor.getValue() : '';
+    } else {
+        payload.rule_python = pyEditor ? pyEditor.getValue() : '';
+    }
+
+    const url    = editingRuleId ? `/api/rules/${editingRuleId}` : '/api/rules';
+    const method = editingRuleId ? 'PUT' : 'POST';
+
+    try {
+        const res  = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        const data = await res.json();
+        if (data.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('ruleModal')).hide();
+            await loadRules();
+        } else {
+            showSaveError(data.error || 'Unknown error.');
+        }
+    } catch(e) { showSaveError(e.message); }
+}
+
+function showSaveError(msg) {
+    const el = document.getElementById('saveError');
+    el.textContent = msg;
+    el.classList.remove('d-none');
+}
+
+// ── Level switching ───────────────────────────────────────────────────────────
+function selectLevel(n, clickedEl) {
+    currentLevel = n;
+    document.querySelectorAll('.level-tabs .nav-link').forEach(a => a.classList.remove('active'));
+    if (clickedEl) clickedEl.classList.add('active');
+    document.getElementById('panelLevel1').style.display = (n===1) ? '' : 'none';
+    document.getElementById('panelLevel2').style.display = (n===2) ? '' : 'none';
+    document.getElementById('panelLevel3').style.display = (n===3) ? '' : 'none';
+    if (n===2 && yamlEditor) setTimeout(()=>yamlEditor.refresh(), 50);
+    if (n===3 && pyEditor)   setTimeout(()=>pyEditor.refresh(),   50);
+}
+
+// ── Level 1: Condition rows ───────────────────────────────────────────────────
+function resetConditions() {
+    condLogic = 'AND';
+    updateLogicBadge();
+    document.getElementById('conditionsContainer').innerHTML = '';
+    addConditionRow();
+}
+
+function toggleLogic() {
+    condLogic = condLogic === 'AND' ? 'OR' : 'AND';
+    updateLogicBadge();
+}
+
+function updateLogicBadge() {
+    const b = document.getElementById('logicBadge');
+    b.textContent = condLogic;
+    b.className = 'logic-badge' + (condLogic==='OR' ? ' or' : '');
+}
+
+function addConditionRow(field='', operator='', value='') {
+    const container = document.getElementById('conditionsContainer');
+    const id = 'cond_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const div = document.createElement('div');
+    div.className = 'condition-row';
+    div.id = id;
+
+    const allOps = [...(schema.simple_operators||[]), ...(schema.temporal_operators||[])];
+
+    div.innerHTML = `
+        <select class="form-select form-select-sm cond-field">
+            <option value="">— Field —</option>
+            ${(schema.fields||[]).map(f=>`<option value="${f.key}" ${f.key===field?'selected':''}>${f.label}</option>`).join('')}
+        </select>
+        <select class="form-select form-select-sm cond-op">
+            ${allOps.map(op=>`<option value="${op.key}" ${op.key===operator?'selected':''}>${op.label}</option>`).join('')}
+        </select>
+        <input type="text" class="form-control form-control-sm cond-val" placeholder="Value" value="${esc(value)}">
+        <button class="btn-remove-cond" onclick="removeCondRow('${id}')"><i class="fas fa-times"></i></button>
+    `;
+    container.appendChild(div);
+}
+
+function removeCondRow(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+function buildDefFromConditions() {
+    const rows = document.querySelectorAll('#conditionsContainer .condition-row');
+    if (!rows.length) return null;
+    const conditions = [];
+    let temporal = null;
+    const temporalKeys = (schema.temporal_operators||[]).map(o=>o.key);
+
+    rows.forEach(row => {
+        const field = row.querySelector('.cond-field').value;
+        const op    = row.querySelector('.cond-op').value;
+        const val   = row.querySelector('.cond-val').value.trim();
+        if (!field || !op) return;
+        if (temporalKeys.includes(op)) {
+            temporal = { operator: op, field, threshold: parseFloat(val)||5, window_seconds: 60 };
+        } else {
+            conditions.push({ field, operator: op, value: val });
+        }
+    });
+
+    if (!conditions.length && !temporal) return null;
+
+    const def = { rule_name: document.getElementById('ruleNameInput').value.trim()||'rule', logic: condLogic };
+    if (conditions.length) def.conditions = conditions;
+    if (temporal) def.temporal = temporal;
+    return def;
+}
+
+function loadConditionsFromDef(rawDef) {
+    resetConditions();
+    document.getElementById('conditionsContainer').innerHTML = '';
+    try {
+        const def = typeof rawDef === 'string' ? JSON.parse(rawDef) : rawDef;
+        if (!def) return;
+        if (def.logic) { condLogic = def.logic; updateLogicBadge(); }
+        (def.conditions||[]).forEach(c => addConditionRow(c.field, c.operator, c.value||''));
+        if (def.temporal) {
+            const t = def.temporal;
+            addConditionRow(t.field, t.operator, String(t.threshold||5));
+        }
+    } catch(e) { addConditionRow(); }
+}
+
+// ── Level 2: YAML helpers ─────────────────────────────────────────────────────
+function defaultYaml() {
+    return `rule_name: My Rule
+logic: AND
+conditions:
+  - field: attack_type
+    operator: contains
+    value: "SQL Injection"
+  - field: severity
+    operator: equals
+    value: "high"
+# Optional temporal operator:
+# temporal:
+#   operator: count_within
+#   field: ip_address
+#   window_seconds: 60
+#   threshold: 5
+`;
+}
+
+function defToYaml(def) {
+    // Simple serialiser — good enough for display
+    let lines = [];
+    if (def.rule_name) lines.push(`rule_name: ${def.rule_name}`);
+    if (def.logic)     lines.push(`logic: ${def.logic}`);
+    if (def.conditions && def.conditions.length) {
+        lines.push('conditions:');
+        def.conditions.forEach(c => {
+            lines.push(`  - field: ${c.field}`);
+            lines.push(`    operator: ${c.operator}`);
+            lines.push(`    value: "${c.value||''}"`);
+        });
+    }
+    if (def.temporal) {
+        const t = def.temporal;
+        lines.push('temporal:');
+        lines.push(`  operator: ${t.operator}`);
+        lines.push(`  field: ${t.field}`);
+        lines.push(`  window_seconds: ${t.window_seconds||60}`);
+        lines.push(`  threshold: ${t.threshold||5}`);
+    }
+    return lines.join('\n');
+}
+
+// ── Level 3: Python default ───────────────────────────────────────────────────
+function defaultPython() {
+    return `def detect(event):
+    """
+    event keys: ip_address, attack_type, endpoint,
+                payload, severity, user_agent, timestamp
+    Return True to trigger the rule.
+    """
+    attack = (event.get("attack_type") or "").lower()
+    if "sql" in attack and event.get("severity") == "high":
+        return True
+    return False
+`;
+}
+
+// ── Test Modal ────────────────────────────────────────────────────────────────
+function openTestModal(id) {
+    testingRuleId = id;
+    const rule = rules.find(r=>r.id===id);
+    document.querySelector('#testModal .modal-title').innerHTML = `<i class="fas fa-flask me-2" style="color:#a78bfa"></i>Test — ${esc(rule?.name||'')}`;
+    document.getElementById('testEventInput').value = '';
+    document.getElementById('testResult').innerHTML = '';
+    new bootstrap.Modal(document.getElementById('testModal')).show();
+}
+
+async function runTest() {
+    const raw = document.getElementById('testEventInput').value.trim();
+    let event = null;
+    if (raw) {
+        try { event = JSON.parse(raw); }
+        catch(e) { document.getElementById('testResult').innerHTML = `<div class="test-error"><i class="fas fa-times-circle me-1"></i>Invalid JSON: ${e.message}</div>`; return; }
+    }
+
+    document.getElementById('testResult').innerHTML = '<div class="text-secondary small"><div class="spinner-border spinner-border-sm me-2"></div>Running…</div>';
+
+    try {
+        const res  = await fetch(`/api/rules/${testingRuleId}/test`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(event ? {event} : {})
+        });
+        const data = await res.json();
+
+        let html = '';
+        if (data.error) {
+            html += `<div class="test-error mb-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>Error:</strong> ${esc(data.error)}</div>`;
+        }
+        if (data.triggered) {
+            html += `<div class="test-triggered mb-2"><i class="fas fa-bolt me-1"></i><strong>TRIGGERED</strong> — rule matched the event.</div>`;
+        } else if (!data.error) {
+            html += `<div class="test-clean mb-2"><i class="fas fa-check-circle me-1"></i><strong>No match</strong> — rule did not trigger on this event.</div>`;
+        }
+        if (data.event) {
+            html += `<p class="sec-head mt-2">Event used</p><pre style="background:rgba(0,0,0,.4);border-radius:8px;padding:10px;font-size:.75rem;color:#c7d2fe;overflow:auto;max-height:200px">${esc(JSON.stringify(data.event, null, 2))}</pre>`;
+        }
+        document.getElementById('testResult').innerHTML = html;
+    } catch(e) {
+        document.getElementById('testResult').innerHTML = `<div class="test-error"><i class="fas fa-times-circle me-1"></i>${e.message}</div>`;
+    }
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

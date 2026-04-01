@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quorra SIEM - Security Logs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+<<<<<<< HEAD
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .log-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 10px;
+        }
+        
+        .severity-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        
+        .severity-critical { background: #dc3545; }
+        .severity-high { background: #fd7e14; }
+        .severity-medium { background: #ffc107; color: #000; }
+        .severity-low { background: #0dcaf0; }
+        .severity-info { background: #6c757d; }
+        
+        .log-details {
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        
+        .live-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>
+                <span class="fw-bold">QUORRA SIEM</span>
+                <span class="badge bg-primary ms-2">v1.0</span>
+                <span class="badge bg-success ms-2 live-badge">LIVE</span>
+            </a>
+            
+            <div class="navbar-nav flex-row align-items-center">
+                <span class="text-light me-3">
+                    <i class="fas fa-user-circle me-1"></i>
+                    {{ username }}
+                </span>
+                <a class="nav-link mx-3" href="/dashboard">
+                    <i class="fas fa-chart-line me-1"></i> Dashboard
+                </a>
+                <a class="nav-link mx-3 active" href="/logs">
+                    <i class="fas fa-list me-1"></i> Logs
+                </a>
+                <a class="nav-link mx-3" href="/attacks">
+                    <i class="fas fa-bug me-1"></i> Attacks
+                </a>
+                <a class="nav-link mx-3" href="/alerts">
+                    <i class="fas fa-bell me-1"></i> Alerts
+                </a>
+                <a class="nav-link mx-3" href="/blocklist">
+                    <i class="fas fa-ban me-1"></i> Blocklist
+                </a>
+                <a class="nav-link mx-3 text-warning" href="/login">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-list me-2"></i>Security Logs
+                    </h1>
+                    <div>
+                        <button class="btn btn-outline-light me-2" onclick="refreshLogs()">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh
+                        </button>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fas fa-download me-1"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/api/logs/export?format=json">JSON Format</a></li>
+                                <li><a class="dropdown-item" href="/api/logs/export?format=cef">CEF Format</a></li>
+                                <li><a class="dropdown-item" href="/api/logs/export?format=syslog">Syslog Format</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted mb-0">Real-time security logs from Block Fortress</p>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="log-card p-3">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Severity</label>
+                            <select class="form-select bg-dark text-light" id="severityFilter">
+                                <option value="">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                                <option value="info">Info</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Attack Type</label>
+                            <select class="form-select bg-dark text-light" id="typeFilter">
+                                <option value="">All Types</option>
+                                <option value="sql">SQL Injection</option>
+                                <option value="xss">XSS</option>
+                                <option value="command">Command Injection</option>
+                                <option value="bruteforce">Brute Force</option>
+                                <option value="admin">Admin Access</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">IP Address</label>
+                            <input type="text" class="form-control bg-dark text-light" id="ipFilter" placeholder="Filter by IP">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button class="btn btn-primary" onclick="applyFilters()">
+                                    <i class="fas fa-filter me-1"></i> Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="log-card p-3">
+                    <div id="logsContainer">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-light" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading security logs...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <nav aria-label="Logs pagination" id="pagination">
+                        <ul class="pagination justify-content-center mt-4">
+                            <!-- Will be populated by JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Log Details Modal -->
+    <div class="modal fade" id="logDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">Log Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="logDetailsContent">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="blockIPFromModal()">
+                        <i class="fas fa-ban me-1"></i> Block IP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentPage = 1;
+        let currentFilters = {};
+        const logsPerPage = 20;
+        
+        async function loadLogs(page = 1) {
+            try {
+                currentPage = page;
+                
+                // Build query string
+                const queryParams = new URLSearchParams({
+                    page: page,
+                    per_page: logsPerPage,
+                    ...currentFilters
+                });
+                
+                const response = await fetch(`/api/logs?${queryParams}`);
+                const data = await response.json();
+                
+                // Update logs container
+                let logsHTML = '';
+                
+                if (data.items && data.items.length > 0) {
+                    logsHTML = '<div class="table-responsive">';
+                    logsHTML += '<table class="table table-dark table-hover">';
+                    logsHTML += `
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>IP Address</th>
+                                <th>Attack Type</th>
+                                <th>Severity</th>
+                                <th>Endpoint</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    data.items.forEach(log => {
+                        const time = new Date(log.timestamp).toLocaleString();
+                        const severityClass = `severity-${log.severity}`;
+                        
+                        logsHTML += `
+                            <tr>
+                                <td><small>${time}</small></td>
+                                <td><code>${log.ip_address}</code></td>
+                                <td>${log.attack_type}</td>
+                                <td><span class="severity-badge ${severityClass}">${log.severity}</span></td>
+                                <td><small>${log.endpoint}</small></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info" onclick="viewLogDetails(${log.id})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="blockIP('${log.ip_address}')">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    logsHTML += '</tbody></table></div>';
+                } else {
+                    logsHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No logs found</p>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('logsContainer').innerHTML = logsHTML;
+                
+                // Update pagination
+                updatePagination(data.total, data.pages, page);
+                
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                document.getElementById('logsContainer').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Error loading logs: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function updatePagination(total, pages, current) {
+            const pagination = document.getElementById('pagination');
+            let paginationHTML = '';
+            
+            if (pages > 1) {
+                paginationHTML = `
+                    <li class="page-item ${current === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="loadLogs(${current - 1})">Previous</a>
+                    </li>
+                `;
+                
+                // Show first page
+                paginationHTML += `
+                    <li class="page-item ${current === 1 ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="loadLogs(1)">1</a>
+                    </li>
+                `;
+                
+                // Show page range
+                let start = Math.max(2, current - 2);
+                let end = Math.min(pages - 1, current + 2);
+                
+                if (start > 2) {
+                    paginationHTML += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                }
+                
+                for (let i = start; i <= end; i++) {
+                    paginationHTML += `
+                        <li class="page-item ${current === i ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="loadLogs(${i})">${i}</a>
+                        </li>
+                    `;
+                }
+                
+                if (end < pages - 1) {
+                    paginationHTML += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                }
+                
+                // Show last page
+                if (pages > 1) {
+                    paginationHTML += `
+                        <li class="page-item ${current === pages ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="loadLogs(${pages})">${pages}</a>
+                        </li>
+                    `;
+                }
+                
+                paginationHTML += `
+                    <li class="page-item ${current === pages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="loadLogs(${current + 1})">Next</a>
+                    </li>
+                `;
+            }
+            
+            pagination.querySelector('ul').innerHTML = paginationHTML;
+        }
+        
+        function applyFilters() {
+            currentFilters = {};
+            
+            const severity = document.getElementById('severityFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const ip = document.getElementById('ipFilter').value;
+            
+            if (severity) currentFilters.severity = severity;
+            if (type) currentFilters.attack_type = type;
+            if (ip) currentFilters.ip_address = ip;
+            
+            loadLogs(1);
+        }
+        
+        async function viewLogDetails(logId) {
+            try {
+                // In a real implementation, you would fetch log details
+                // For now, we'll show a simplified view
+                const modal = new bootstrap.Modal(document.getElementById('logDetailsModal'));
+                
+                // Get log details (you would typically fetch this from an API)
+                const response = await fetch(`/api/logs?page=1&per_page=100`);
+                const data = await response.json();
+                const log = data.items.find(l => l.id === logId);
+                
+                if (log) {
+                    const details = JSON.parse(log.raw_data || '{}');
+                    
+                    document.getElementById('logDetailsContent').innerHTML = `
+                        <div class="mb-3">
+                            <strong>IP Address:</strong> <code>${log.ip_address}</code>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Timestamp:</strong> ${new Date(log.timestamp).toLocaleString()}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Attack Type:</strong> ${log.attack_type}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Severity:</strong> <span class="severity-badge severity-${log.severity}">${log.severity}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Endpoint:</strong> ${log.endpoint}
+                        </div>
+                        <div class="mb-3">
+                            <strong>User Agent:</strong> <small>${log.user_agent || 'Unknown'}</small>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Payload:</strong>
+                            <div class="log-details">${log.payload || 'No payload'}</div>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Raw Data:</strong>
+                            <div class="log-details">${JSON.stringify(details, null, 2)}</div>
+                        </div>
+                    `;
+                }
+                
+                modal.show();
+            } catch (error) {
+                console.error('Error loading log details:', error);
+                alert('Failed to load log details');
+            }
+        }
+        
+        async function blockIP(ipAddress) {
+            if (confirm(`Are you sure you want to block IP ${ipAddress}?`)) {
+                try {
+                    const response = await fetch('/api/block_ip', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ip_address: ipAddress,
+                            reason: 'Manual block from logs page'
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    alert(result.message);
+                    
+                    // Reload logs to reflect the block
+                    loadLogs(currentPage);
+                } catch (error) {
+                    console.error('Error blocking IP:', error);
+                    alert('Failed to block IP');
+                }
+            }
+        }
+        
+        function blockIPFromModal() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('logDetailsModal'));
+            const ip = document.querySelector('#logDetailsContent code').textContent;
+            modal.hide();
+            blockIP(ip);
+        }
+        
+        function refreshLogs() {
+            loadLogs(currentPage);
+        }
+        
+        // Auto-refresh logs every 30 seconds
+        setInterval(() => {
+            loadLogs(currentPage);
+        }, 30000);
+        
+        // Initial load
+        loadLogs(1);
+    </script>
+</body>
+</html>
+=======
+        body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+        .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px;}
+
+        .sev{padding:2px 7px;border-radius:99px;font-size:.68rem;font-weight:600;display:inline-block;}
+        .sev-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+        .sev-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+        .sev-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+        .sev-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+        .sev-info{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        .risk-pill{padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:700;display:inline-block;}
+        .risk-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+        .risk-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.5);}
+        .risk-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.5);}
+        .risk-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.5);}
+        .risk-info{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.4);}
+
+        .ml-tag{font-size:.63rem;padding:1px 6px;border-radius:99px;margin-right:3px;display:inline-block;}
+        .ml-anomaly{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);}
+        .ml-ueba{background:rgba(168,85,247,.15);color:#d8b4fe;border:1px solid rgba(168,85,247,.3);}
+        .ml-lstm{background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(59,130,246,.3);}
+        .ml-novel{background:rgba(234,179,8,.15);color:#fde68a;border:1px solid rgba(234,179,8,.3);}
+        .ml-chain{background:rgba(239,68,68,.25);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+        .ml-mitre{background:rgba(99,102,241,.15);color:#c7d2fe;border:1px solid rgba(99,102,241,.3);}
+
+        .log-row{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+        .log-row:last-child{border-bottom:none;}
+        .log-row:hover{background:rgba(255,255,255,.02);}
+
+        .risk-bar{height:4px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;width:80px;}
+        .risk-bar-fill{height:100%;border-radius:99px;}
+
+        .form-select,.form-control{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.85rem;}
+        .form-select option{background:#1f2937;}
+
+        .sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:12px;font-weight:600;}
+        .live-badge{animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+        table.log-table{width:100%;border-collapse:collapse;}
+        table.log-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;}
+        table.log-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.82rem;vertical-align:middle;}
+        table.log-table tr:hover td{background:rgba(255,255,255,.02);}
+        code{color:#a78bfa;background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px;font-size:.8rem;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link px-2" href="/dashboard"><i class="fas fa-chart-line me-1"></i>Dashboard</a>
+            <a class="nav-link active px-2" href="/logs"><i class="fas fa-list me-1"></i>Logs</a>
+            <a class="nav-link px-2" href="/attacks"><i class="fas fa-bug me-1"></i>Attacks</a>
+            <a class="nav-link px-2" href="/alerts"><i class="fas fa-bell me-1"></i>Alerts</a>
+            <a class="nav-link px-2" href="/blocklist"><i class="fas fa-ban me-1"></i>Blocklist</a>
+            <a class="nav-link px-2" href="/rules"><i class="fas fa-sliders-h me-1"></i>Rules</a>
+            <a class="nav-link px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+    <!-- Header + export -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0">Security Logs</h1>
+            <p class="text-secondary mb-0" style="font-size:.8rem">Every log enriched with ML risk score, threat label, and MITRE mapping</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs(currentPage)"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-info dropdown-toggle" data-bs-toggle="dropdown"><i class="fas fa-download me-1"></i>Export</button>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="/api/logs/export?format=json">JSON</a></li>
+                    <li><a class="dropdown-item" href="/api/logs/export?format=cef">CEF</a></li>
+                    <li><a class="dropdown-item" href="/api/logs/export?format=syslog">Syslog</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ML summary strip for logs -->
+    <div class="g-card py-3 px-4 mb-3">
+        <div class="row g-3 text-center">
+            <div class="col-6 col-md-3"><div style="font-size:1.4rem;font-weight:700;color:#ef4444" id="critLogCount">—</div><div style="font-size:.7rem;color:#9ca3af">Critical Risk Logs</div></div>
+            <div class="col-6 col-md-3"><div style="font-size:1.4rem;font-weight:700;color:#a78bfa" id="mlFlagCount">—</div><div style="font-size:.7rem;color:#9ca3af">ML-Flagged Logs</div></div>
+            <div class="col-6 col-md-3"><div style="font-size:1.4rem;font-weight:700;color:#eab308" id="novelCount">—</div><div style="font-size:.7rem;color:#9ca3af">Novel Patterns</div></div>
+            <div class="col-6 col-md-3"><div style="font-size:1.4rem;font-weight:700;color:#22c55e" id="totalLogCount">—</div><div style="font-size:.7rem;color:#9ca3af">Total Logs</div></div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="g-card py-3 px-4 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">Severity</label>
+                <select class="form-select form-select-sm" id="severityFilter">
+                    <option value="">All</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">ML Risk</label>
+                <select class="form-select form-select-sm" id="mlRiskFilter">
+                    <option value="">All</option>
+                    <option value="critical">Critical (80+)</option>
+                    <option value="high">High (60+)</option>
+                    <option value="ml_flagged">ML-Flagged only</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">Attack Type</label>
+                <input type="text" class="form-control form-control-sm" id="typeFilter" placeholder="e.g. sql">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="sec-head d-block">IP Address</label>
+                <input type="text" class="form-control form-control-sm" id="ipFilter" placeholder="e.g. 192.168">
+            </div>
+            <div class="col-12 col-md-4 d-flex gap-2 mt-1">
+                <button class="btn btn-sm btn-primary flex-fill" onclick="applyFilters()"><i class="fas fa-filter me-1"></i>Filter</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log table -->
+    <div class="g-card p-0" style="overflow:hidden">
+        <div style="overflow-x:auto">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP</th>
+                        <th>Attack Type</th>
+                        <th>Severity</th>
+                        <th style="color:#a78bfa">ML Risk</th>
+                        <th style="color:#a78bfa">Threat Label</th>
+                        <th style="color:#a78bfa">ML Flags</th>
+                        <th style="color:#a78bfa">MITRE</th>
+                        <th>Endpoint</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <tr><td colspan="10" class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="p-3">
+            <ul class="pagination pagination-sm justify-content-center mb-0" id="logPagination"></ul>
+        </div>
+    </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal fade" id="logModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+                <h5 class="modal-title"><i class="fas fa-robot me-2" style="color:#a78bfa"></i>Log + ML Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="logModalBody"></div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-sm btn-danger" id="modalBlockBtn"><i class="fas fa-ban me-1"></i>Block IP</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentPage = 1;
+let currentFilters = {};
+let allLogs = [];
+
+function riskClass(score) {
+    if (score >= 80) return 'critical';
+    if (score >= 60) return 'high';
+    if (score >= 40) return 'medium';
+    if (score >= 20) return 'low';
+    return 'info';
+}
+
+function mlTagsFromRaw(raw) {
+    if (!raw) return '';
+    const tags = [];
+    if (raw.is_anomaly)       tags.push('<span class="ml-tag ml-anomaly">anomaly</span>');
+    if (raw.is_ueba_anomaly)  tags.push('<span class="ml-tag ml-ueba">UEBA</span>');
+    if (raw.is_sequential)    tags.push('<span class="ml-tag ml-lstm">LSTM</span>');
+    if (raw.is_novel_log)     tags.push('<span class="ml-tag ml-novel">novel</span>');
+    (raw.attack_chain||[]).forEach(c => tags.push(`<span class="ml-tag ml-chain">[chain]${c.pattern_name||'chain'}</span>`));
+    return tags.join('');
+}
+
+async function loadLogs(page=1) {
+    currentPage = page;
+    const params = new URLSearchParams({page, per_page:20, ...currentFilters});
+    try {
+        const res  = await fetch(`/api/logs?${params}`);
+        const data = await res.json();
+        allLogs    = data.items || [];
+
+        // parse raw_data to get ML fields
+        let crit=0, flagged=0, novel=0;
+        const enriched = allLogs.map(l => {
+            let raw = {}; try { raw = JSON.parse(l.raw_data||'{}'); } catch(e){}
+            const mlScore = raw.ml_risk_score || raw.risk_score || null;
+            const mlLabel = raw.ml_threat_label || raw.threat_label || null;
+            const mlMitre = raw.ml_mitre || raw.mitre_tactic || null;
+            if (mlScore >= 80) crit++;
+            if (raw.is_anomaly || raw.is_ueba_anomaly || raw.is_sequential || raw.is_novel_log) flagged++;
+            if (raw.is_novel_log) novel++;
+            return {...l, raw, mlScore, mlLabel, mlMitre};
+        });
+
+        document.getElementById('critLogCount').textContent  = crit;
+        document.getElementById('mlFlagCount').textContent   = flagged;
+        document.getElementById('novelCount').textContent    = novel;
+        document.getElementById('totalLogCount').textContent = data.total;
+
+        if (!enriched.length) {
+            document.getElementById('logTableBody').innerHTML =
+                '<tr><td colspan="10" class="text-center py-5 text-secondary"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>No logs found</td></tr>';
+            document.getElementById('logPagination').innerHTML = '';
+            return;
+        }
+
+        document.getElementById('logTableBody').innerHTML = enriched.map(l => {
+            const rc  = l.mlScore !== null ? riskClass(l.mlScore) : null;
+            const bar = l.mlScore !== null ? `<div class="risk-bar mt-1"><div class="risk-bar-fill" style="width:${l.mlScore}%;background:${rc==='critical'?'#ef4444':rc==='high'?'#f97316':rc==='medium'?'#eab308':'#22c55e'}"></div></div>` : '';
+            const tags = mlTagsFromRaw(l.raw);
+            return `
+            <tr onclick="viewLog(${l.id})" style="cursor:pointer">
+                <td style="white-space:nowrap;font-size:.75rem;color:#9ca3af">${new Date(l.timestamp).toLocaleString()}</td>
+                <td><code>${l.ip_address}</code></td>
+                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.attack_type}</td>
+                <td><span class="sev sev-${l.severity}">${l.severity}</span></td>
+                <td>
+                    ${l.mlScore !== null ? `<span class="risk-pill risk-${rc}">${l.mlScore}</span>${bar}` : '<span class="text-secondary" style="font-size:.7rem">—</span>'}
+                </td>
+                <td style="font-size:.75rem">${l.mlLabel ? `<span style="color:#a78bfa">${l.mlLabel}</span>` : '—'}</td>
+                <td style="white-space:nowrap">${tags || '<span class="text-secondary" style="font-size:.7rem">—</span>'}</td>
+                <td style="font-size:.7rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.mlMitre ? `<span class="ml-tag ml-mitre">${l.mlMitre.split(' ')[0]}</span>` : '—'}</td>
+                <td style="font-size:.75rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9ca3af">${l.endpoint}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger p-1 px-2" onclick="event.stopPropagation();blockIP('${l.ip_address}')"><i class="fas fa-ban" style="font-size:.7rem"></i></button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        // Pagination
+        const pages = data.pages;
+        if (pages > 1) {
+            let pg = `<li class="page-item ${currentPage===1?'disabled':''}"><a class="page-link" href="#" onclick="loadLogs(${currentPage-1})">‹</a></li>`;
+            for (let i=Math.max(1,currentPage-2);i<=Math.min(pages,currentPage+2);i++)
+                pg += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" href="#" onclick="loadLogs(${i})">${i}</a></li>`;
+            pg += `<li class="page-item ${currentPage===pages?'disabled':''}"><a class="page-link" href="#" onclick="loadLogs(${currentPage+1})">›</a></li>`;
+            document.getElementById('logPagination').innerHTML = pg;
+        } else {
+            document.getElementById('logPagination').innerHTML = '';
+        }
+
+    } catch(e) {
+        document.getElementById('logTableBody').innerHTML =
+            `<tr><td colspan="10" class="text-danger text-center py-4">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function viewLog(id) {
+    const l = allLogs.find(x=>x.id===id);
+    if (!l) return;
+    let raw={}; try{raw=JSON.parse(l.raw_data||'{}');}catch(e){}
+    const mlScore = raw.ml_risk_score || raw.risk_score || null;
+    const sb = raw.signal_breakdown || (raw.risk || {}).signal_breakdown || null;
+
+    const signalHTML = sb ? `
+    <div class="mt-3">
+        <p class="sec-head">ML Signal Breakdown</p>
+        <div class="row g-2">
+            ${Object.entries(sb).map(([k,v]) => `
+            <div class="col-6 col-md-4">
+                <div style="font-size:.7rem;color:#9ca3af;text-transform:capitalize">${k}</div>
+                <div style="height:4px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:3px">
+                    <div style="height:100%;width:${v}%;background:#a78bfa;border-radius:99px"></div>
+                </div>
+                <div style="font-size:.7rem;color:#a78bfa">${v}/100</div>
+            </div>`).join('')}
+        </div>
+    </div>` : '';
+
+    document.getElementById('logModalBody').innerHTML = `
+    <div class="row g-3">
+        <div class="col-md-6">
+            <p class="sec-head">Log Details</p>
+            <table class="table table-sm" style="color:#e5e7eb;font-size:.82rem">
+                <tr><td class="text-secondary">IP</td><td><code>${l.ip_address}</code></td></tr>
+                <tr><td class="text-secondary">Time</td><td>${new Date(l.timestamp).toLocaleString()}</td></tr>
+                <tr><td class="text-secondary">Attack type</td><td>${l.attack_type}</td></tr>
+                <tr><td class="text-secondary">Severity</td><td><span class="sev sev-${l.severity}">${l.severity}</span></td></tr>
+                <tr><td class="text-secondary">Endpoint</td><td style="word-break:break-all">${l.endpoint}</td></tr>
+                <tr><td class="text-secondary">User-Agent</td><td style="font-size:.72rem;word-break:break-all">${l.user_agent||'—'}</td></tr>
+            </table>
+            <p class="sec-head mt-2">Payload</p>
+            <pre style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;font-size:.75rem;max-height:140px;overflow:auto;color:#a78bfa">${l.payload||'—'}</pre>
+        </div>
+        <div class="col-md-6">
+            <p class="sec-head">ML Analysis</p>
+            ${mlScore !== null ? `
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div style="font-size:2rem;font-weight:700;color:${mlScore>=80?'#ef4444':mlScore>=60?'#f97316':mlScore>=40?'#eab308':'#22c55e'}">${mlScore}<span style="font-size:.9rem;color:#6b7280">/100</span></div>
+                <div>
+                    <div class="risk-pill risk-${riskClass(mlScore)} mb-1">${riskClass(mlScore).toUpperCase()} RISK</div>
+                    ${raw.threat_label ? `<div style="font-size:.78rem;color:#a78bfa">${raw.threat_label}</div>` : ''}
+                    ${raw.mitre_tactic ? `<div style="font-size:.7rem;color:#818cf8">${raw.mitre_tactic}</div>` : ''}
+                </div>
+            </div>` : '<p class="text-secondary small">ML models not trained yet.</p>'}
+            <div class="mb-2">${mlTagsFromRaw(raw)}</div>
+            ${(raw.attack_chain||[]).length ? `
+            <div class="mt-2">
+                <p class="sec-head">Attack Chains</p>
+                ${(raw.attack_chain||[]).map(c=>`<div class="mb-1" style="font-size:.75rem">[chain]<strong>${c.pattern_name}</strong> — risk ${Math.round(c.chain_risk*100)}%</div>`).join('')}
+            </div>` : ''}
+            ${(raw.ueba||{}).anomalies?.length ? `
+            <div class="mt-2">
+                <p class="sec-head">UEBA Anomalies</p>
+                ${raw.ueba.anomalies.map(a=>`<div class="mb-1 small text-warning">[!]${a}</div>`).join('')}
+            </div>` : ''}
+            ${signalHTML}
+        </div>
+    </div>`;
+
+    document.getElementById('modalBlockBtn').onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById('logModal')).hide();
+        blockIP(l.ip_address);
+    };
+    new bootstrap.Modal(document.getElementById('logModal')).show();
+}
+
+function applyFilters() {
+    currentFilters = {};
+    const sev = document.getElementById('severityFilter').value;
+    const typ = document.getElementById('typeFilter').value;
+    const ip  = document.getElementById('ipFilter').value;
+    if (sev) currentFilters.severity    = sev;
+    if (typ) currentFilters.attack_type = typ;
+    if (ip)  currentFilters.ip_address  = ip;
+    loadLogs(1);
+}
+
+function clearFilters() {
+    ['severityFilter','mlRiskFilter','typeFilter','ipFilter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value='';
+    });
+    currentFilters = {};
+    loadLogs(1);
+}
+
+async function blockIP(ip) {
+    if (!confirm(`Block IP ${ip}?`)) return;
+    const res = await fetch('/api/block_ip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip_address:ip,reason:'Manual block from logs'})});
+    const r = await res.json();
+    alert(r.message);
+}
+
+function riskClass(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
+
+setInterval(()=>loadLogs(currentPage),30000);
+loadLogs(1);
+</script>
+</body>
+</html>
+>>>>>>> cea6978 (Reconnected project and updated files)

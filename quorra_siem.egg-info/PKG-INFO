@@ -1,0 +1,30 @@
+Metadata-Version: 2.4
+Name: quorra-siem
+Version: 1.0.0
+Summary: SIEM tool for Block Fortress application
+Author: Security Team
+Keywords: siem security monitoring block-fortress
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: Topic :: Security
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+License-File: LICENSE
+Requires-Dist: flask>=2.3.3
+Requires-Dist: flask-sqlalchemy>=3.0.5
+Requires-Dist: flask-cors>=4.0.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: websocket-client>=1.6.3
+Requires-Dist: werkzeug>=2.3.7
+Dynamic: author
+Dynamic: classifier
+Dynamic: keywords
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

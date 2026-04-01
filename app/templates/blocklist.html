@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
+    <title>Quorra SIEM - IP Blocklist</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .blocklist-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 15px;
+        }
+        
+        .ip-badge {
+            font-family: monospace;
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid rgba(220, 53, 69, 0.3);
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.3;
+            margin-bottom: 20px;
+        }
+        
+        .live-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>
+                <span class="fw-bold">QUORRA SIEM</span>
+                <span class="badge bg-primary ms-2">v1.0</span>
+                <span class="badge bg-success ms-2 live-badge">LIVE</span>
+            </a>
+            
+            <div class="navbar-nav flex-row align-items-center">
+                <span class="text-light me-3">
+                    <i class="fas fa-user-circle me-1"></i>
+                    {{ username }}
+                </span>
+                <a class="nav-link mx-3" href="/dashboard">
+                    <i class="fas fa-chart-line me-1"></i> Dashboard
+                </a>
+                <a class="nav-link mx-3" href="/logs">
+                    <i class="fas fa-list me-1"></i> Logs
+                </a>
+                <a class="nav-link mx-3" href="/attacks">
+                    <i class="fas fa-bug me-1"></i> Attacks
+                </a>
+                <a class="nav-link mx-3" href="/alerts">
+                    <i class="fas fa-bell me-1"></i> Alerts
+                </a>
+                <a class="nav-link mx-3 active" href="/blocklist">
+                    <i class="fas fa-ban me-1"></i> Blocklist
+                </a>
+                <a class="nav-link mx-3 text-warning" href="/login">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-ban me-2"></i>IP Blocklist
+                    </h1>
+                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addBlockModal">
+                        <i class="fas fa-plus me-1"></i> Add IP to Blocklist
+                    </button>
+                </div>
+                <p class="text-muted mb-0">Manage blocked IP addresses</p>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="blocklist-card p-3 text-center">
+                    <div class="display-6 fw-bold text-danger" id="totalBlocked">0</div>
+                    <div class="text-muted">Total Blocked IPs</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="blocklist-card p-3 text-center">
+                    <div class="display-6 fw-bold text-warning" id="autoBlocked">0</div>
+                    <div class="text-muted">Auto-Blocked</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="blocklist-card p-3 text-center">
+                    <div class="display-6 fw-bold text-info" id="todayBlocked">0</div>
+                    <div class="text-muted">Blocked Today</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Blocklist Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="blocklist-card p-3">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="blocklistTable">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>Reason</th>
+                                    <th>Blocked By</th>
+                                    <th>Blocked At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="blocklistBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="spinner-border text-light" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-3">Loading blocklist...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="empty-state" id="emptyState" style="display: none;">
+                        <i class="fas fa-ban"></i>
+                        <h4 class="text-muted">No Blocked IPs</h4>
+                        <p class="text-muted">No IP addresses are currently blocked</p>
+                        <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#addBlockModal">
+                            <i class="fas fa-plus me-1"></i> Add First IP
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add IP Modal -->
+    <div class="modal fade" id="addBlockModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add IP to Blocklist</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addBlockForm">
+                        <div class="mb-3">
+                            <label for="ipAddress" class="form-label">IP Address</label>
+                            <input type="text" class="form-control bg-dark text-light" 
+                                   id="ipAddress" placeholder="e.g., 192.168.1.100" required>
+                            <div class="form-text">Enter a valid IPv4 or IPv6 address</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="blockReason" class="form-label">Reason</label>
+                            <textarea class="form-control bg-dark text-light" 
+                                     id="blockReason" rows="3" 
+                                     placeholder="Why are you blocking this IP?"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="addToBlocklist()">
+                        <i class="fas fa-ban me-1"></i> Block IP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm Unblock Modal -->
+    <div class="modal fade" id="confirmUnblockModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Unblock</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to unblock <strong id="unblockIP">?</strong>?</p>
+                    <p class="text-muted small">This will allow the IP to access your systems again.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirmUnblockBtn">
+                        <i class="fas fa-check me-1"></i> Yes, Unblock
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let blocklistData = [];
+        let ipToUnblock = '';
+        
+        async function loadBlocklist() {
+            try {
+                // In a real implementation, you would fetch from an API
+                // For now, we'll use sample data
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                // Update statistics
+                document.getElementById('totalBlocked').textContent = stats.blocked_ips;
+                
+                // For demo purposes, we'll calculate auto-blocked and today's blocked
+                const autoBlocked = Math.floor(stats.blocked_ips * 0.7); // 70% auto-blocked
+                const todayBlocked = Math.floor(stats.blocked_ips * 0.2); // 20% blocked today
+                
+                document.getElementById('autoBlocked').textContent = autoBlocked;
+                document.getElementById('todayBlocked').textContent = todayBlocked;
+                
+                // Load blocklist data
+                // In a real implementation, you would have an API endpoint for this
+                // For now, we'll generate sample data
+                generateSampleBlocklist();
+                
+            } catch (error) {
+                console.error('Error loading blocklist:', error);
+                document.getElementById('blocklistBody').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Error loading blocklist: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        
+        function generateSampleBlocklist() {
+            // Sample blocklist data
+            blocklistData = [
+                {
+                    ip_address: '192.168.1.100',
+                    reason: 'Multiple SQL injection attempts',
+                    blocked_by: 'system',
+                    blocked_at: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+                },
+                {
+                    ip_address: '10.0.0.50',
+                    reason: 'Brute force attack on login',
+                    blocked_by: 'system',
+                    blocked_at: new Date(Date.now() - 7200000).toISOString() // 2 hours ago
+                },
+                {
+                    ip_address: '172.16.0.25',
+                    reason: 'Command injection attempt',
+                    blocked_by: 'user-quorra',
+                    blocked_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+                },
+                {
+                    ip_address: '203.0.113.45',
+                    reason: 'XSS attack on contact form',
+                    blocked_by: 'system',
+                    blocked_at: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+                }
+            ];
+            
+            updateBlocklistTable();
+        }
+        
+        function updateBlocklistTable() {
+            const tbody = document.getElementById('blocklistBody');
+            
+            if (blocklistData.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('blocklistTable').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('blocklistTable').style.display = 'table';
+            
+            let tableHTML = '';
+            
+            blocklistData.forEach((block, index) => {
+                const time = new Date(block.blocked_at).toLocaleString();
+                const blockedBy = block.blocked_by === 'system' ? 
+                    '<span class="badge bg-info">System</span>' : 
+                    `<span class="badge bg-warning">${block.blocked_by}</span>`;
+                
+                tableHTML += `
+                    <tr id="block-row-${index}">
+                        <td>
+                            <span class="ip-badge">${block.ip_address}</span>
+                        </td>
+                        <td>${block.reason}</td>
+                        <td>${blockedBy}</td>
+                        <td><small>${time}</small></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="confirmUnblock('${block.ip_address}')">
+                                <i class="fas fa-unlock me-1"></i> Unblock
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = tableHTML;
+        }
+        
+        async function addToBlocklist() {
+            const ipAddress = document.getElementById('ipAddress').value.trim();
+            const reason = document.getElementById('blockReason').value.trim();
+            
+            // Basic IP validation
+            const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            
+            if (!ipRegex.test(ipAddress)) {
+                alert('Please enter a valid IPv4 address');
+                return;
+            }
+            
+            if (!reason) {
+                alert('Please provide a reason for blocking this IP');
+                return;
+            }
+            
+            try {
+                // In a real implementation, you would call an API endpoint
+                // For now, we'll add to our local data
+                const newBlock = {
+                    ip_address: ipAddress,
+                    reason: reason,
+                    blocked_by: '{{ username }}',
+                    blocked_at: new Date().toISOString()
+                };
+                
+                blocklistData.unshift(newBlock);
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addBlockModal'));
+                modal.hide();
+                
+                // Reset form
+                document.getElementById('addBlockForm').reset();
+                
+                // Update table
+                updateBlocklistTable();
+                
+                // Update statistics
+                loadBlocklist();
+                
+                // Show success message
+                showNotification(`IP ${ipAddress} added to blocklist`, 'success');
+                
+            } catch (error) {
+                console.error('Error adding to blocklist:', error);
+                showNotification('Failed to add IP to blocklist', 'error');
+            }
+        }
+        
+        function confirmUnblock(ipAddress) {
+            ipToUnblock = ipAddress;
+            document.getElementById('unblockIP').textContent = ipAddress;
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmUnblockModal'));
+            modal.show();
+            
+            // Set up confirmation button
+            document.getElementById('confirmUnblockBtn').onclick = () => {
+                unblockIP(ipAddress);
+                modal.hide();
+            };
+        }
+        
+        async function unblockIP(ipAddress) {
+            try {
+                // In a real implementation, you would call an API endpoint
+                // For now, we'll remove from our local data
+                blocklistData = blocklistData.filter(block => block.ip_address !== ipAddress);
+                
+                // Update table
+                updateBlocklistTable();
+                
+                // Update statistics
+                loadBlocklist();
+                
+                // Show success message
+                showNotification(`IP ${ipAddress} unblocked`, 'success');
+                
+            } catch (error) {
+                console.error('Error unblocking IP:', error);
+                showNotification('Failed to unblock IP', 'error');
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                min-width: 300px;
+            `;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Auto-refresh every 60 seconds
+        setInterval(loadBlocklist, 60000);
+        
+        // Initial load
+        loadBlocklist();
+    </script>
+</body>
+</html>
+=======
+    <title>Quorra SIEM - Blocklist</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+        .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px;}
+
+        .ip-badge{font-family:monospace;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);padding:3px 10px;border-radius:6px;display:inline-block;color:#fca5a5;font-size:.82rem;}
+
+        .block-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:4px solid #ef4444;border-radius:10px;padding:14px;margin-bottom:10px;transition:.2s;}
+        .block-card:hover{background:rgba(239,68,68,.04);border-left-color:#f97316;}
+        .block-card.auto-block{border-left-color:#a78bfa;}
+
+        .ml-tag{font-size:.63rem;padding:1px 6px;border-radius:99px;margin-right:3px;display:inline-block;}
+        .ml-anomaly{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);}
+        .ml-ueba{background:rgba(168,85,247,.15);color:#d8b4fe;border:1px solid rgba(168,85,247,.3);}
+        .ml-chain{background:rgba(239,68,68,.25);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+        .ml-rule{background:rgba(107,114,128,.15);color:#9ca3af;border:1px solid rgba(107,114,128,.3);}
+
+        .risk-mini{font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;}
+        .risk-critical{background:rgba(239,68,68,.2);color:#fca5a5;}
+        .risk-high{background:rgba(249,115,22,.2);color:#fdba74;}
+        .risk-medium{background:rgba(234,179,8,.2);color:#fde68a;}
+        .risk-low{background:rgba(34,197,94,.2);color:#86efac;}
+
+        .stat-num{font-size:2rem;font-weight:700;line-height:1;}
+        .sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:10px;font-weight:600;}
+        code{color:#a78bfa;background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px;font-size:.78rem;}
+        .live-badge{animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .form-control,.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+        .form-select option{background:#1f2937;}
+        #toast-area{position:fixed;top:20px;right:20px;z-index:9999;min-width:260px;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+            <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+            <a class="nav-link px-2" href="/logs">Logs</a>
+            <a class="nav-link px-2" href="/attacks">Attacks</a>
+            <a class="nav-link px-2" href="/alerts">Alerts</a>
+            <a class="nav-link active px-2" href="/blocklist">Blocklist</a>
+            <a class="nav-link px-2" href="/rules"><i class="fas fa-sliders-h me-1"></i>Rules</a>
+            <a class="nav-link px-2" href="/sdk"><i class="fas fa-code me-1"></i>SDK</a>
+            <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div id="toast-area"></div>
+
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0">IP Blocklist</h1>
+            <p class="text-secondary mb-0" style="font-size:.8rem">Each blocked IP shows ML risk context — why it was flagged and which models detected it</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadBlocklist()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus me-1"></i>Block IP</button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-danger" id="totalBlocked">—</div><div class="sec-head mt-1 mb-0">Total Blocked</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num" style="color:#a78bfa" id="mlBlocked">—</div><div class="sec-head mt-1 mb-0">ML Auto-Blocked</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-warning" id="ruleBlocked">—</div><div class="sec-head mt-1 mb-0">Rule Auto-Blocked</div></div></div>
+        <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num text-secondary" id="manualBlocked">—</div><div class="sec-head mt-1 mb-0">Manual Blocks</div></div></div>
+    </div>
+
+    <!-- ML blocked IPs - top risky from UEBA/Risk scorer -->
+    <div class="g-card mb-3" id="mlRiskyPanel" style="display:none">
+        <p class="sec-head">ML-Identified High-Risk IPs (not yet blocked)</p>
+        <div id="mlRiskyList"></div>
+    </div>
+
+    <!-- Search + filter -->
+    <div class="g-card py-3 px-4 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm" id="ipSearch" placeholder="Search IP…" oninput="renderBlocklist()">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select form-select-sm" id="sourceFilter" onchange="renderBlocklist()">
+                    <option value="">All Sources</option>
+                    <option value="ml">ML Auto-Blocked</option>
+                    <option value="system">Rule Auto-Blocked</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </div>
+            <div class="col-md-5 d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('ipSearch').value='';document.getElementById('sourceFilter').value='';renderBlocklist()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="blocklistContainer"><div class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</div></div>
+</div>
+
+<!-- Add Block Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)"><h5 class="modal-title">Block IP Address</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label sec-head">IP Address</label><input type="text" class="form-control" id="ipInput" placeholder="e.g. 192.168.1.100"></div>
+                <div class="mb-3"><label class="form-label sec-head">Reason</label><textarea class="form-control" id="reasonInput" rows="3" placeholder="Why are you blocking this IP?"></textarea></div>
+            </div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm btn-danger" onclick="addBlock()"><i class="fas fa-ban me-1"></i>Block</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IP detail modal -->
+<div class="modal fade" id="ipDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)"><h5 class="modal-title"><i class="fas fa-robot me-2" style="color:#a78bfa"></i>IP Intelligence</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="ipDetailBody"></div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-sm btn-success" id="unblockModalBtn">Unblock</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let blocklistData = [];
+let mlEntityData  = {};
+
+function rc(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
+
+async function loadBlocklist() {
+    try {
+        const [blRes, mlRes] = await Promise.all([
+            fetch('/api/blocklist'),
+            fetch('/api/ml/summary').catch(()=>({ok:false})),
+        ]);
+        blocklistData = await blRes.json();
+
+        if (mlRes.ok) {
+            const mlSum = await mlRes.json();
+            // build entity lookup from top risky entities
+            (mlSum.top_risky_entities||[]).forEach(e => { mlEntityData[e.entity_id] = e; });
+
+            // Show ML high-risk panel for IPs not yet blocked
+            const blockedIPs = new Set(blocklistData.map(b=>b.ip_address));
+            const unblocked  = (mlSum.top_risky_entities||[]).filter(e=>!blockedIPs.has(e.entity_id) && e.avg_risk>=60);
+            if (unblocked.length) {
+                document.getElementById('mlRiskyPanel').style.display='';
+                document.getElementById('mlRiskyList').innerHTML = unblocked.map(e=>`
+                <div class="d-flex align-items-center justify-content-between mb-2 p-2 rounded" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15)">
+                    <div>
+                        <code>${e.entity_id}</code>
+                        <span class="risk-mini risk-${rc(e.avg_risk)} ms-2">Risk ${Math.round(e.avg_risk)}</span>
+                        <span style="font-size:.7rem;color:#9ca3af;margin-left:6px">trend: ${e.trend}</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem" onclick="quickBlock('${e.entity_id}','ML auto-suggestion: avg risk ${Math.round(e.avg_risk)}')">Block</button>
+                </div>`).join('');
+            }
+        }
+
+        // Stats
+        const ml_auto  = blocklistData.filter(b=>b.reason&&b.reason.toLowerCase().includes('ml')).length;
+        const rule_auto = blocklistData.filter(b=>b.blocked_by==='system'&&!(b.reason||'').toLowerCase().includes('ml')).length;
+        const manual    = blocklistData.filter(b=>b.blocked_by!=='system').length;
+        document.getElementById('totalBlocked').textContent  = blocklistData.length;
+        document.getElementById('mlBlocked').textContent     = ml_auto;
+        document.getElementById('ruleBlocked').textContent   = rule_auto;
+        document.getElementById('manualBlocked').textContent = manual;
+
+        renderBlocklist();
+    } catch(e) {
+        document.getElementById('blocklistContainer').innerHTML=`<div class="text-danger text-center py-4">Error: ${e.message}</div>`;
+    }
+}
+
+function renderBlocklist() {
+    const search = (document.getElementById('ipSearch').value||'').toLowerCase();
+    const src    = document.getElementById('sourceFilter').value;
+
+    let list = blocklistData.filter(b => {
+        if (search && !b.ip_address.includes(search)) return false;
+        if (src==='ml'     && !(b.reason||'').toLowerCase().includes('ml')) return false;
+        if (src==='system' && (b.blocked_by!=='system' || (b.reason||'').toLowerCase().includes('ml'))) return false;
+        if (src==='manual' && b.blocked_by==='system') return false;
+        return true;
+    });
+
+    if (!list.length) {
+        document.getElementById('blocklistContainer').innerHTML=`
+        <div class="text-center py-5 text-secondary">
+            <i class="fas fa-ban fa-3x mb-3 d-block" style="opacity:.3"></i>
+            <h5>${blocklistData.length?'No results match filters':'No blocked IPs'}</h5>
+        </div>`;
+        return;
+    }
+
+    document.getElementById('blocklistContainer').innerHTML = list.map(b => {
+        const isMl     = (b.reason||'').toLowerCase().includes('ml');
+        const isSystem = b.blocked_by === 'system';
+        const entity   = mlEntityData[b.ip_address];
+        const mlRisk   = entity ? entity.avg_risk : null;
+
+        const sourceTag = isMl
+            ? '<span class="ml-tag ml-ueba">ML auto</span>'
+            : isSystem
+            ? '<span class="ml-tag ml-rule">Rule auto</span>'
+            : '<span class="ml-tag" style="background:rgba(255,255,255,.08);color:#9ca3af;border:1px solid rgba(255,255,255,.15)">Manual</span>';
+
+        return `
+        <div class="block-card ${isMl?'auto-block':''}" onclick="viewIPDetail(${b.id})" style="cursor:pointer">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div class="flex-fill">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="ip-badge">${b.ip_address}</span>
+                        ${sourceTag}
+                        ${mlRisk!==null?`<span class="risk-mini risk-${rc(mlRisk)}">ML Risk ${Math.round(mlRisk)}</span>`:''}
+                        ${entity?.trend==='rising'?'<span style="font-size:.68rem;color:#ef4444">↑ Rising</span>':''}
+                    </div>
+                    <div style="font-size:.78rem;color:#9ca3af">${b.reason||'—'}</div>
+                    <div style="font-size:.7rem;color:#6b7280;margin-top:3px">
+                        Blocked by <strong style="color:#e5e7eb">${b.blocked_by}</strong>
+                        &nbsp;·&nbsp; ${new Date(b.blocked_at).toLocaleString()}
+                        ${entity?` &nbsp;·&nbsp; ${entity.high_risk_events||0} high-risk events`:''}
+                    </div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                    <button class="btn btn-sm btn-outline-secondary p-1 px-2" onclick="event.stopPropagation();viewIPDetail(${b.id})" style="font-size:.7rem"><i class="fas fa-robot me-1"></i>ML</button>
+                    <button class="btn btn-sm btn-outline-success p-1 px-2" onclick="event.stopPropagation();confirmUnblock(${b.id},'${b.ip_address}')" style="font-size:.7rem"><i class="fas fa-unlock me-1"></i>Unblock</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function viewIPDetail(id) {
+    const b = blocklistData.find(x=>x.id===id);
+    if (!b) return;
+    const entity = mlEntityData[b.ip_address];
+
+    // Fetch ML entity data and geo in parallel
+    let entityData = entity || null;
+    let geoData    = null;
+    const [mlRes, geoRes] = await Promise.allSettled([
+        fetch(`/api/ml/entity/${encodeURIComponent(b.ip_address)}`).then(r=>r.ok?r.json():null),
+        fetch(`/api/geoip/${encodeURIComponent(b.ip_address)}`).then(r=>r.json()),
+    ]);
+    if (mlRes.status==='fulfilled' && mlRes.value)  entityData = {...(entityData||{}), ...mlRes.value};
+    if (geoRes.status==='fulfilled' && geoRes.value) geoData   = geoRes.value;
+
+    const geoHTML = geoData && !geoData.error ? `
+        <p class="sec-head mt-3">Geo-Location <span style="font-size:.65rem;color:#6b7280">(${geoData.source})</span></p>
+        <table class="table table-sm mb-0" style="color:#e5e7eb;font-size:.8rem">
+            <tr><td class="text-secondary" width="38%">Country</td><td>${geoData.country_code?`<img src="https://flagcdn.com/16x12/${geoData.country_code.toLowerCase()}.png" class="me-2" alt="">`:``}${geoData.country||'—'}</td></tr>
+            ${geoData.region   ? `<tr><td class="text-secondary">Region</td><td>${geoData.region}</td></tr>` : ''}
+            <tr><td class="text-secondary">City</td><td>${geoData.city||'—'}</td></tr>
+            ${geoData.lat      ? `<tr><td class="text-secondary">Coordinates</td><td>${geoData.lat}, ${geoData.lon} <a href="https://www.openstreetmap.org/?mlat=${geoData.lat}&mlon=${geoData.lon}#map=8/${geoData.lat}/${geoData.lon}" target="_blank" rel="noopener" style="font-size:.72rem;color:#06b6d4;margin-left:6px"><i class="fas fa-external-link-alt"></i> Map</a></td></tr>` : ''}
+            ${geoData.isp      ? `<tr><td class="text-secondary">ISP</td><td>${geoData.isp}</td></tr>` : ''}
+            ${geoData.org      ? `<tr><td class="text-secondary">Org</td><td>${geoData.org}</td></tr>` : ''}
+            ${geoData.timezone ? `<tr><td class="text-secondary">Timezone</td><td>${geoData.timezone}</td></tr>` : ''}
+        </table>` : (geoData?.error ? `<p class="text-secondary small mt-2"><i class="fas fa-map-marker-alt me-1"></i>${geoData.error}</p>` : '');
+
+    document.getElementById('ipDetailBody').innerHTML=`
+    <div class="row g-3">
+        <div class="col-md-5">
+            <p class="sec-head">Block Info</p>
+            <table class="table table-sm" style="color:#e5e7eb;font-size:.82rem">
+                <tr><td class="text-secondary">IP</td><td><span class="ip-badge">${b.ip_address}</span></td></tr>
+                <tr><td class="text-secondary">Reason</td><td>${b.reason||'—'}</td></tr>
+                <tr><td class="text-secondary">Blocked by</td><td>${b.blocked_by}</td></tr>
+                <tr><td class="text-secondary">Blocked at</td><td>${new Date(b.blocked_at).toLocaleString()}</td></tr>
+            </table>
+            ${geoHTML}
+        </div>
+        <div class="col-md-7">
+            <p class="sec-head">ML Intelligence for this IP</p>
+            ${entityData ? `
+            <div class="mb-2">
+                ${entityData.avg_risk!==undefined?`<span class="risk-mini risk-${rc(entityData.avg_risk)} me-2">Avg Risk ${Math.round(entityData.avg_risk)}</span>`:''}
+                ${entityData.trend?`<span style="font-size:.75rem;color:#9ca3af">Trend: ${entityData.trend}</span>`:''}
+            </div>
+            ${entityData.profile ? `
+            <div class="mb-2" style="font-size:.8rem">
+                <div>Total events: <strong>${entityData.profile.total_events||0}</strong></div>
+                <div>Known countries: <strong>${(entityData.profile.known_countries||[]).join(', ')||'—'}</strong></div>
+                <div>Last seen: <strong>${entityData.profile.last_seen?new Date(entityData.profile.last_seen).toLocaleString():'—'}</strong></div>
+            </div>` : ''}
+            ${(entityData.graph?.detected_chains||[]).length?`
+            <p class="sec-head mt-2">Attack Chains</p>
+            ${entityData.graph.detected_chains.slice(0,3).map(c=>`<div class="mb-1 small">[chain]<strong>${c.pattern_name}</strong> — ${new Date(c.matched_at).toLocaleString()}</div>`).join('')}`:''}
+            ` : '<p class="text-secondary small">ML profile not available — models build up as events are ingested.</p>'}
+        </div>
+    </div>`;
+
+    document.getElementById('unblockModalBtn').onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById('ipDetailModal')).hide();
+        confirmUnblock(b.id, b.ip_address);
+    };
+    new bootstrap.Modal(document.getElementById('ipDetailModal')).show();
+}
+
+function confirmUnblock(id, ip) {
+    if (!confirm(`Unblock ${ip}? This allows the IP to access your systems again.`)) return;
+    unblockIP(id, ip);
+}
+
+async function unblockIP(id, ip) {
+    const res = await fetch(`/api/unblock_ip/${id}`,{method:'DELETE'});
+    const r   = await res.json();
+    toast(r.message, r.success?'success':'danger');
+    if (r.success) loadBlocklist();
+}
+
+async function addBlock() {
+    const ip     = (document.getElementById('ipInput').value||'').trim();
+    const reason = (document.getElementById('reasonInput').value||'').trim();
+    if (!ip)     { toast('Enter a valid IP address','danger'); return; }
+    if (!reason) { toast('Enter a reason','danger'); return; }
+    const res = await fetch('/api/block_ip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip_address:ip,reason})});
+    const r   = await res.json();
+    bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+    document.getElementById('ipInput').value='';
+    document.getElementById('reasonInput').value='';
+    toast(r.message, r.success?'success':'warning');
+    if (r.success) loadBlocklist();
+}
+
+async function quickBlock(ip, reason) {
+    const res = await fetch('/api/block_ip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip_address:ip,reason})});
+    const r   = await res.json();
+    toast(r.message, r.success?'success':'warning');
+    if (r.success) loadBlocklist();
+}
+
+function toast(msg, type='info') {
+    const el = document.createElement('div');
+    el.className=`alert alert-${type} alert-dismissible fade show py-2`;
+    el.style.fontSize='.82rem';
+    el.innerHTML=`${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.getElementById('toast-area').appendChild(el);
+    setTimeout(()=>el.remove(), 4000);
+}
+
+function rc(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
+
+setInterval(loadBlocklist, 60000);
+loadBlocklist();
+</script>
+</body>
+</html>
+>>>>>>> cea6978 (Reconnected project and updated files)

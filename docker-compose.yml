@@ -1,0 +1,68 @@
+version: "3.9"
+
+# Quorra SIEM — Docker Compose deployment
+# Works on Windows (Docker Desktop), Linux, and macOS.
+#
+# Quick start:
+#   docker-compose up -d
+#   Open: http://localhost:5001
+#
+# With custom env vars:
+#   cp .env.example .env   # fill in values
+#   docker-compose up -d
+
+services:
+  quorra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: quorra-siem:2.0.0
+    container_name: quorra-siem
+    restart: unless-stopped
+
+    ports:
+      - "5001:5001"        # Dashboard / API
+      - "5140:5140/udp"    # Syslog UDP (optional)
+      - "5141:5141/tcp"    # Syslog TCP (optional)
+
+    volumes:
+      # Persist database and trained ML models between restarts
+      - quorra-data:/app/data
+      # Persist log files
+      - quorra-logs:/app/logs
+
+    environment:
+      # Override any Config value via environment variables.
+      # Copy .env.example to .env and docker-compose will load it automatically.
+      - QUORRA_USERNAME=${QUORRA_USERNAME:-user-quorra}
+      - QUORRA_PASSWORD=${QUORRA_PASSWORD:-quorra@1000}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - INGEST_API_KEY=${INGEST_API_KEY:-}
+      - BLOCK_FORTRESS_URL=${BLOCK_FORTRESS_URL:-http://host.docker.internal:5000}
+      - BLOCK_FORTRESS_WS_URL=${BLOCK_FORTRESS_WS_URL:-ws://host.docker.internal:5000/api/ws/logs}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - SYSLOG_LISTENER_ENABLED=${SYSLOG_LISTENER_ENABLED:-false}
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY:-}
+      - TZ=${TZ:-UTC}
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 30s
+      timeout:  10s
+      retries:   3
+      start_period: 20s
+
+    # Allow access to Block Fortress on the host machine (Docker Desktop)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  quorra-data:
+    driver: local
+  quorra-logs:
+    driver: local

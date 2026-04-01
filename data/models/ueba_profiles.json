@@ -1,0 +1,19 @@
+{
+  "127.0.0.1": {
+    "total_events": 600,
+    "attack_types": {
+      "api_request": 532,
+      "sql injection attempt": 2,
+      "admin panel access": 58,
+      "failed login - wrong password": 2,
+      "successful login": 4,
+      "user registration": 2
+    },
+    "known_countries": [],
+    "last_seen": "2026-03-27T19:24:16.461349",
+    "first_seen": "2026-03-27T19:24:16.459281",
+    "hourly_baseline": {
+      "19": 600
+    }
+  }
+}
