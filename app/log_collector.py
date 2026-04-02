@@ -1,13 +1,7 @@
-<<<<<<< HEAD
-import json
-import requests
-from datetime import datetime
-=======
 #log_collector.py
 import json
 import requests
 from datetime import datetime, timezone as _tz
->>>>>>> cea6978 (Reconnected project and updated files)
 import time
 from app.config import Config
 from app.database import db
@@ -15,12 +9,12 @@ from app.models import LogEntry
 
 class LogCollector:
     """Collect logs from Block Fortress application."""
-    
+
     def __init__(self):
         self.block_fortress_url = Config.BLOCK_FORTRESS_URL
         self.ws_url = Config.BLOCK_FORTRESS_WS_URL
         self.last_fetch = None
-    
+
     def fetch_logs_via_api(self):
         """Fetch logs from Block Fortress API."""
         try:
@@ -31,13 +25,13 @@ class LogCollector:
                 return self.process_logs(logs)
         except Exception as e:
             print(f"Error fetching logs via API: {e}")
-        
+
         return []
-    
+
     def process_logs(self, logs):
         """Process and store logs."""
         processed_logs = []
-        
+
         for log_data in logs:
             try:
                 # Create log entry
@@ -48,34 +42,26 @@ class LogCollector:
                     payload=log_data.get('payload', '')[:1000],
                     user_agent=log_data.get('userAgent'),
                     severity=log_data.get('severity', 'medium'),
-<<<<<<< HEAD
-                    timestamp=datetime.fromisoformat(log_data.get('timestamp').replace('Z', '+00:00')) 
-=======
                     timestamp=datetime.fromisoformat(log_data.get('timestamp').replace('Z', '+00:00')).astimezone(_tz.utc).replace(tzinfo=None)
->>>>>>> cea6978 (Reconnected project and updated files)
                     if log_data.get('timestamp') else datetime.utcnow(),
                     raw_data=json.dumps(log_data)
                 )
-                
+
                 db.session.add(log_entry)
                 processed_logs.append(log_entry)
-                
+
             except Exception as e:
                 print(f"Error processing log: {e}")
-        
+
         if processed_logs:
             db.session.commit()
-        
+
         return processed_logs
-    
+
     def simulate_test_logs(self):
         """Generate simulated logs for testing when Block Fortress is not available."""
-<<<<<<< HEAD
-        print("⚠️  Block Fortress not available. Generating test logs...")
-=======
         print("Warning: Block Fortress not available. Generating test logs...")
->>>>>>> cea6978 (Reconnected project and updated files)
-        
+
         test_logs = [
             {
                 'ipAddress': '192.168.1.100',
@@ -105,9 +91,9 @@ class LogCollector:
                 'timestamp': datetime.utcnow().isoformat()
             }
         ]
-        
+
         return self.process_logs(test_logs)
-    
+
     def check_block_fortress_availability(self):
         """Check if Block Fortress is available."""
         try:

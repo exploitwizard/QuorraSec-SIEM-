@@ -1,95 +1,12 @@
 #!/usr/bin/env python3
 """
 Quorra SIEM Tool - Main Entry Point
-<<<<<<< HEAD
-Command-line interface for Block Fortress integration
-=======
 Cross-platform CLI for Block Fortress integration.
 Supports Windows, Linux, and macOS.
->>>>>>> cea6978 (Reconnected project and updated files)
 """
 
 import sys
 import os
-<<<<<<< HEAD
-import webbrowser
-import socket
-import signal
-from pathlib import Path
-from app.main import app
-
-def find_free_port(start_port=5001, max_port=5010):
-    """Find a free port to run the application."""
-    for port in range(start_port, max_port + 1):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', port))
-                return port
-        except OSError:
-            continue
-    return start_port
-
-def signal_handler(sig, frame):
-    """Handle Ctrl+C gracefully."""
-    print("\n\n Shutting down Quorra SIEM...")
-    sys.exit(0)
-
-def main():
-    """Main entry point for Quorra SIEM tool."""
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    print("""
-    ╔═══════════════════════════════════════╗
-    ║            QUORRA SIEM                ║
-    ║      Block Fortress Integration       ║
-    ╚═══════════════════════════════════════╝
-    """)
-    
-    # Check if running from terminal with command
-    if len(sys.argv) > 1 and sys.argv[1] == "help":
-        print("\nUsage: quorra [command]")
-        print("\nCommands:")
-        print("  start     - Start Quorra SIEM dashboard")
-        print("  stop      - Stop Quorra SIEM")
-        print("  status    - Check Quorra status")
-        print("  help      - Show this help message")
-        return
-    
-    # Find a free port
-    port = find_free_port()
-    
-    print(f" Starting Quorra SIEM on port {port}...")
-    print(" Connecting to Block Fortress on port 5000...")
-    print(" Initializing security monitoring...")
-    
-    # Set environment variables
-    os.environ['QUORRA_PORT'] = str(port)
-    os.environ['BLOCK_FORTRESS_URL'] = 'http://localhost:5000'
-    
-    # Print the URL for easy access
-    url = f"http://localhost:{port}"
-    print(f"\n Quorra is running!")
-    print(f" Open your browser and visit: {url}")
-    print(f" Copy this link: {url}")
-    
-    # Ask if user wants to open browser automatically
-    response = input("\n Open in browser now? (y/n): ").strip().lower()
-    if response in ['y', 'yes', '']:
-        webbrowser.open(url)
-    
-    print("\n Monitoring Block Fortress security logs...")
-    print(" Detection Rules Active:")
-    print("  1. Brute Force (10 failed logins in 2 mins)")
-    print("  2. Geo-velocity (same user, different countries)")
-    print("  3. Admin privilege escalation")
-    print("  4. OS Command Injection")
-    print("  5. Blocked IP detection")
-    
-    print("\n Press Ctrl+C to stop Quorra\n")
-    
-    # Run the application
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
-=======
 import signal
 import socket
 import argparse
@@ -102,7 +19,7 @@ from logging.handlers import RotatingFileHandler
 # Logging setup (before importing the app so Flask's startup messages use it)
 # ---------------------------------------------------------------------------
 
-def _setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None:
+def _setup_logging(log_level: str = "INFO", log_file=None):
     """Configure root logger with rotating file + console handlers."""
     if log_file is None:
         # Platform-aware log directory
@@ -126,7 +43,7 @@ def _setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None
     root = logging.getLogger()
     root.setLevel(level)
 
-    # Rotating file handler — 10 MB × 5 files (Windows-safe: no locks held on closed files)
+    # Rotating file handler — 10 MB x 5 files (Windows-safe: no locks held on closed files)
     try:
         fh = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5,
                                  encoding="utf-8")
@@ -147,7 +64,7 @@ def _setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None
 # Port discovery
 # ---------------------------------------------------------------------------
 
-def _kill_port_processes(port_range: tuple[int, int]) -> None:
+def _kill_port_processes(port_range):
     """Kill any processes holding ports in the given range (Unix/macOS)."""
     if sys.platform not in ("darwin", "linux"):
         return
@@ -169,7 +86,8 @@ def _kill_port_processes(port_range: tuple[int, int]) -> None:
         except Exception:
             pass
 
-def find_free_port(start: int = 5001, end: int = 5020) -> int:
+
+def find_free_port(start=5001, end=5020):
     """Return the first free TCP port in the given range."""
     import time
     _kill_port_processes((start, end))
@@ -191,7 +109,7 @@ def find_free_port(start: int = 5001, end: int = 5020) -> int:
 # Browser open (with OS-specific fallbacks)
 # ---------------------------------------------------------------------------
 
-def open_browser(url: str) -> None:
+def open_browser(url):
     import webbrowser
     import subprocess
 
@@ -218,7 +136,7 @@ def open_browser(url: str) -> None:
 # Signal handling (cross-platform)
 # ---------------------------------------------------------------------------
 
-def _setup_signals() -> None:
+def _setup_signals():
     """Register graceful shutdown handlers for all platforms."""
     def _handler(sig, frame):
         print("\n\nShutting down Quorra SIEM...")
@@ -239,7 +157,7 @@ def _setup_signals() -> None:
 # TLS helper (optional self-signed cert for local HTTPS)
 # ---------------------------------------------------------------------------
 
-def _ensure_tls_cert(cert_file: str, key_file: str) -> bool:
+def _ensure_tls_cert(cert_file, key_file):
     """
     Generate a self-signed TLS certificate if it does not exist.
     Returns True if TLS is ready, False on failure.
@@ -286,8 +204,7 @@ def _ensure_tls_cert(cert_file: str, key_file: str) -> bool:
 # Production WSGI server selection (cross-platform)
 # ---------------------------------------------------------------------------
 
-def _run_server(flask_app, host: str, port: int, tls: bool,
-                cert_file: str, key_file: str) -> None:
+def _run_server(flask_app, host, port, tls, cert_file, key_file):
     """
     Choose the best available WSGI server for the current platform.
 
@@ -367,7 +284,7 @@ def _run_server(flask_app, host: str, port: int, tls: bool,
 # Service installer
 # ---------------------------------------------------------------------------
 
-def install_service() -> None:
+def install_service():
     """Install Quorra as a system service (systemd / launchd / Windows SCM)."""
     script = Path(__file__).resolve()
 
@@ -379,7 +296,7 @@ def install_service() -> None:
         _install_systemd_service(script)
 
 
-def _install_systemd_service(script: Path) -> None:
+def _install_systemd_service(script):
     user      = os.environ.get("USER", "quorra")
     work_dir  = script.parent
     exec_path = f"{sys.executable} {script} --no-browser"
@@ -413,7 +330,7 @@ WantedBy=multi-user.target
         print(unit)
 
 
-def _install_launchd_service(script: Path) -> None:
+def _install_launchd_service(script):
     work_dir = script.parent
     plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -442,36 +359,26 @@ def _install_launchd_service(script: Path) -> None:
     print(f"Load with: launchctl load {dest}")
 
 
-def _install_windows_service(script: Path) -> None:
-    try:
-        import win32serviceutil
-        print("To install as a Windows service, use NSSM (Non-Sucking Service Manager):")
-        print("  nssm install QuorraSIEM")
-        print(f"  Set application to: {sys.executable}")
-        print(f"  Set arguments to: {script} --no-browser")
-        print("  nssm start QuorraSIEM")
-        print("\nDownload NSSM: https://nssm.cc/")
-    except ImportError:
-        # Provide manual instructions if pywin32 not available
-        print("Windows Service Installation:")
-        print("  Option 1 — NSSM (recommended):")
-        print("    nssm install QuorraSIEM")
-        print(f"    Application: {sys.executable}")
-        print(f"    Arguments: {script} --no-browser")
-        print("")
-        print("  Option 2 — Task Scheduler:")
-        print("    schtasks /create /sc ONSTART /tn QuorraSIEM \\")
-        print(f"      /tr \"\\\"{sys.executable}\\\" \\\"{script}\\\" --no-browser\"")
+def _install_windows_service(script):
+    print("Windows Service Installation:")
+    print("  Option 1 - NSSM (recommended):")
+    print("    nssm install QuorraSIEM")
+    print(f"    Application: {sys.executable}")
+    print(f"    Arguments: {script} --no-browser")
+    print("")
+    print("  Option 2 - Task Scheduler:")
+    print("    schtasks /create /sc ONSTART /tn QuorraSIEM \\")
+    print(f"      /tr \"\\\"{sys.executable}\\\" \\\"{script}\\\" --no-browser\"")
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser():
     p = argparse.ArgumentParser(
         prog="quorra",
-        description="Quorra SIEM — Block Fortress Security Integration",
+        description="Quorra SIEM - Block Fortress Security Integration",
     )
     p.add_argument("--port",       type=int,  default=0,
                    help="Port to listen on (default: auto-select 5001-5020)")
@@ -493,7 +400,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main() -> None:
+def main():
     args = build_parser().parse_args()
 
     # Handle --install-service before importing the app
@@ -532,7 +439,6 @@ def main() -> None:
     print(f"Listening on     : {url}")
     print(f"Block Fortress   : {Config.BLOCK_FORTRESS_URL}")
     print(f"Syslog listener  : {'enabled (UDP:{} TCP:{})'.format(Config.SYSLOG_UDP_PORT, Config.SYSLOG_TCP_PORT) if Config.SYSLOG_LISTENER_ENABLED else 'disabled'}")
-    print(f"Rate limiting    : {'enabled' if getattr(app, '_limiter', None) else 'enabled' if Config.RATELIMIT_INGEST else 'disabled'}")
     print(f"Prometheus       : {'enabled (/metrics)' if Config.METRICS_ENABLED else 'disabled'}")
     print()
     print("Detection Rules Active:")
@@ -562,7 +468,6 @@ def main() -> None:
         key_file=Config.TLS_KEY_FILE,
     )
 
->>>>>>> cea6978 (Reconnected project and updated files)
 
 if __name__ == "__main__":
     main()

@@ -1,111 +1,38 @@
 #!/usr/bin/env python3
 """
 Quorra SIEM Installation Script
-<<<<<<< HEAD
-=======
 Cross-platform: Windows, Linux, macOS
->>>>>>> cea6978 (Reconnected project and updated files)
+
+Usage:
+    python3 install.py              # standard install
+    python3 install.py --no-venv    # skip virtual environment
+    python3 install.py --geoip-key <key>   # auto-download GeoLite2 DB
+    python3 install.py --install-service   # also register as OS service
 """
 
 import os
 import sys
 import subprocess
-<<<<<<< HEAD
-import shutil
-
-def run_command(cmd, check=True):
-    """Run a shell command."""
-    print(f"➜ {cmd}")
-=======
 import argparse
+import sysconfig
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
-def run_command(cmd: str, check: bool = True) -> bool:
+def run_command(cmd, check=True):
     """Run a shell command and print it."""
     print(f"  > {cmd}")
->>>>>>> cea6978 (Reconnected project and updated files)
     try:
         subprocess.run(cmd, shell=True, check=check)
         return True
     except subprocess.CalledProcessError as e:
-<<<<<<< HEAD
-        print(f"Command failed: {e}")
-        return False
-
-def main():
-    print(" Installing Quorra SIEM Tool...")
-    print("=" * 50)
-    
-    # Check Python version
-    python_version = sys.version_info
-    if python_version.major < 3 or (python_version.major == 3 and python_version.minor < 8):
-        print(f"Error: Python 3.8+ required. Found Python {python_version.major}.{python_version.minor}")
-        sys.exit(1)
-    
-    print(f"Python {python_version.major}.{python_version.minor}.{python_version.micro} detected")
-    
-    # Create necessary directories
-    print("\n📁 Creating directories...")
-    os.makedirs("data", exist_ok=True)
-    os.makedirs("logs", exist_ok=True)
-    os.makedirs("templates", exist_ok=True)
-    
-    # Create virtual environment
-    if not os.path.exists("venv"):
-        print("\n Creating virtual environment...")
-        run_command("python -m venv venv")
-    else:
-        print("\n Virtual environment already exists")
-    
-    # Determine activation command
-    if os.name == 'nt':  # Windows
-        python_cmd = "venv\\Scripts\\python"
-        pip_cmd = "venv\\Scripts\\pip"
-    else:  # Linux/Mac
-        python_cmd = "venv/bin/python"
-        pip_cmd = "venv/bin/pip"
-    
-    # Install dependencies
-    print("\n📦 Installing dependencies...")
-    run_command(f"{pip_cmd} install --upgrade pip")
-    run_command(f"{pip_cmd} install -r requirements.txt")
-    
-    # Make main script executable
-    if os.name != 'nt':  # Not Windows
-        print("\n⚙️  Setting up permissions...")
-        run_command("chmod +x quorra.py")
-    
-    # Install globally
-    print("\n🔗 Installing globally...")
-    run_command(f"{pip_cmd} install -e .")
-    
-    # Create initial database
-    print("\n🗃️  Initializing database...")
-    run_command(f"{python_cmd} -c \"from app.database import db; from app import app; with app.app_context(): db.create_all()\"")
-    
-    print("\n" + "=" * 50)
-    print("Installation complete!")
-    print("\n To start Quorra SIEM:")
-    print("   1. First start Block Fortress on port 5000")
-    print("   2. Run: quorra")
-    print("\n Login Credentials:")
-    print("   Username: user-quorra")
-    print("   Password: quorra@1000")
-    print("\n Login page will be available at: http://localhost:5001/login")
-    print("\n  Troubleshooting:")
-    print("   - Make sure port 5001 is available")
-    print("   - Check if Block Fortress is running on port 5000")
-    print("   - If login fails, check the database in data/quorra.db")
-=======
         print(f"  Command failed: {e}")
         return False
 
 
-def get_venv_paths() -> tuple[str, str]:
+def get_venv_paths():
     """Return (python_cmd, pip_cmd) for the venv on the current platform."""
     if sys.platform == "win32":
         return (str(BASE_DIR / "venv" / "Scripts" / "python.exe"),
@@ -115,7 +42,7 @@ def get_venv_paths() -> tuple[str, str]:
                 str(BASE_DIR / "venv" / "bin" / "pip"))
 
 
-def create_directories() -> None:
+def create_directories():
     """Create all required data and log directories."""
     dirs = [
         BASE_DIR / "data",
@@ -129,7 +56,7 @@ def create_directories() -> None:
     print("  Directories created")
 
 
-def download_geoip_db(license_key: str) -> None:
+def download_geoip_db(license_key):
     """
     Download the free GeoLite2-City database from MaxMind.
     Requires a free MaxMind account and license key.
@@ -177,7 +104,7 @@ def download_geoip_db(license_key: str) -> None:
         print("  You can download it manually from MaxMind.")
 
 
-def create_windows_launcher() -> None:
+def create_windows_launcher():
     """Create quorra.bat for Windows users who prefer double-click launch."""
     bat = BASE_DIR / "quorra.bat"
     content = (
@@ -193,7 +120,7 @@ def create_windows_launcher() -> None:
     print(f"  Windows launcher created: {bat}")
 
 
-def create_unix_launcher() -> None:
+def create_unix_launcher():
     """Create quorra.sh for Unix/macOS convenience."""
     sh = BASE_DIR / "quorra.sh"
     content = (
@@ -210,13 +137,83 @@ def create_unix_launcher() -> None:
     print(f"  Unix launcher created: {sh}")
 
 
-def create_env_template() -> None:
+def create_global_launcher(venv_python):
+    """
+    Create a global 'quorra' command so it can be run from any terminal.
+
+    On Linux/macOS: writes a wrapper shell script to ~/.local/bin/quorra
+                    (falls back to /usr/local/bin if writable).
+    On Windows:     writes quorra.bat to the user Python Scripts directory,
+                    which pip already adds to PATH during Python installation.
+    """
+    quorra_script = BASE_DIR / "quorra.py"
+
+    if sys.platform == "win32":
+        # User Scripts directory (no admin required)
+        scripts_dir = Path(sysconfig.get_path("scripts", "nt_user"))
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        bat = scripts_dir / "quorra.bat"
+        bat.write_text(
+            "@echo off\r\n"
+            f"cd /d \"{BASE_DIR}\"\r\n"
+            f"\"{venv_python}\" \"{quorra_script}\" %*\r\n"
+        )
+        print(f"  Global command created : {bat}")
+        print(f"  Ensure this directory is in your PATH: {scripts_dir}")
+        return
+
+    # Unix / macOS — try candidates in order of preference
+    candidates = [
+        Path.home() / ".local" / "bin",   # user-writable, standard on Linux/macOS
+        Path("/usr/local/bin"),            # system-wide (may need sudo)
+    ]
+
+    for bin_dir in candidates:
+        wrapper = bin_dir / "quorra"
+        try:
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            wrapper.write_text(
+                "#!/bin/sh\n"
+                f"exec \"{venv_python}\" \"{quorra_script}\" \"$@\"\n"
+            )
+            wrapper.chmod(0o755)
+            print(f"  Global command created : {wrapper}")
+
+            # Warn if the directory is not on PATH
+            path_dirs = os.environ.get("PATH", "").split(":")
+            if str(bin_dir) not in path_dirs:
+                shell_rc = _detect_shell_rc()
+                print(f"\n  NOTE: {bin_dir} is not in your PATH.")
+                print(f"  Add it by running:")
+                print(f'    echo \'export PATH="{bin_dir}:$PATH"\' >> {shell_rc}')
+                print(f"    source {shell_rc}")
+            return
+        except PermissionError:
+            continue
+
+    print("  Warning: Could not create global launcher (permission denied).")
+    print(f"  Run install.py with sudo, or add this to PATH manually:")
+    print(f"    {BASE_DIR / 'venv' / 'bin'}")
+
+
+def _detect_shell_rc():
+    """Return the most likely shell rc file path for the current user."""
+    shell = os.environ.get("SHELL", "")
+    home = Path.home()
+    if "zsh" in shell:
+        return home / ".zshrc"
+    if "fish" in shell:
+        return home / ".config" / "fish" / "config.fish"
+    return home / ".bashrc"
+
+
+def create_env_template():
     """Write a .env.example file documenting all environment variables."""
     env_example = BASE_DIR / ".env.example"
     if env_example.exists():
         return
     content = """\
-# Quorra SIEM — Environment Variables
+# Quorra SIEM - Environment Variables
 # Copy this file to .env and fill in the values.
 
 # ---- Security (REQUIRED for production) ----
@@ -266,7 +263,7 @@ TLS_KEY_FILE=data/tls/key.pem
     print(f"  Environment template created: {env_example}")
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(
         description="Install Quorra SIEM Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -274,7 +271,7 @@ def main() -> None:
     parser.add_argument("--geoip-key", default=os.environ.get("MAXMIND_LICENSE_KEY", ""),
                         help="MaxMind license key for GeoLite2 auto-download")
     parser.add_argument("--no-venv",   action="store_true",
-                        help="Skip virtual environment creation")
+                        help="Skip virtual environment creation (use system Python)")
     parser.add_argument("--install-service", action="store_true",
                         help="Install Quorra as a system service after installation")
     args = parser.parse_args()
@@ -293,37 +290,49 @@ def main() -> None:
     print("\nCreating directories...")
     create_directories()
 
-    # --- Virtual environment ---
-    if not args.no_venv:
-        if not (BASE_DIR / "venv").exists():
+    # --- Virtual environment + dependencies ---
+    if args.no_venv:
+        python_cmd = sys.executable
+        pip_cmd    = f'"{sys.executable}" -m pip'
+        print("\nSkipping virtual environment (--no-venv).")
+    else:
+        venv_dir = BASE_DIR / "venv"
+        if not venv_dir.exists():
             print("\nCreating virtual environment...")
-            run_command(f'"{sys.executable}" -m venv venv')
+            run_command(f'"{sys.executable}" -m venv "{venv_dir}"')
         else:
             print("\n  Virtual environment already exists")
 
         python_cmd, pip_cmd = get_venv_paths()
+        python_cmd = f'"{python_cmd}"'
+        pip_cmd    = f'"{pip_cmd}"'
 
-        print("\nInstalling dependencies...")
-        run_command(f'"{pip_cmd}" install --upgrade pip --quiet')
-        run_command(f'"{pip_cmd}" install -r requirements.txt')
+    print("\nInstalling dependencies...")
+    run_command(f'{pip_cmd} install --upgrade pip --quiet')
+    run_command(f'{pip_cmd} install -r "{BASE_DIR / "requirements.txt"}"')
 
-        print("\nInstalling Quorra package...")
-        run_command(f'"{pip_cmd}" install -e . --quiet')
+    print("\nInstalling Quorra package (editable)...")
+    run_command(f'{pip_cmd} install -e "{BASE_DIR}" --quiet')
 
     # --- Platform-specific setup ---
     if sys.platform != "win32":
         print("\nSetting file permissions...")
-        for f in ("quorra.py", "quorra.sh"):
-            fp = BASE_DIR / f
+        for fname in ("quorra.py", "quorra.sh"):
+            fp = BASE_DIR / fname
             if fp.exists():
                 fp.chmod(0o755)
+        create_unix_launcher()
     else:
         print("\nCreating Windows launcher...")
         create_windows_launcher()
 
-    # Unix launcher (always useful on Linux/macOS)
-    if sys.platform != "win32":
-        create_unix_launcher()
+    # --- Global 'quorra' command ---
+    print("\nCreating global 'quorra' command...")
+    if args.no_venv:
+        venv_python = sys.executable
+    else:
+        venv_python, _ = get_venv_paths()
+    create_global_launcher(venv_python)
 
     # --- GeoIP ---
     print("\nChecking GeoIP database...")
@@ -336,27 +345,25 @@ def main() -> None:
     # --- Service installation ---
     if args.install_service:
         print("\nInstalling system service...")
-        run_command(f'"{sys.executable}" quorra.py --install-service')
+        run_command(f'"{sys.executable}" "{BASE_DIR / "quorra.py"}" --install-service')
 
     print("\n" + "=" * 60)
     print("Installation complete!")
     print()
-    print("To start Quorra SIEM:")
+    print("To start Quorra SIEM, open a NEW terminal and run:")
+    print("  quorra")
+    print()
     if sys.platform == "win32":
-        print("  quorra.bat")
-        print("  -- or --")
-        print("  venv\\Scripts\\python.exe quorra.py")
+        print("  Or double-click: quorra.bat")
     else:
-        print("  ./quorra.sh")
-        print("  -- or --")
-        print("  venv/bin/python quorra.py")
+        print("  Or run directly: ./quorra.sh")
     print()
     print("Available CLI flags:")
     print("  --no-browser        Don't auto-open the browser")
     print("  --port <N>          Use a specific port")
     print("  --log-level DEBUG   Verbose logging")
     print("  --tls               Enable HTTPS")
-    print("  --install-service   Install as OS service")
+    print("  --install-service   Register as OS service")
     print()
     print("Default credentials (CHANGE BEFORE PRODUCTION USE):")
     print("  Username : user-quorra")
@@ -367,11 +374,11 @@ def main() -> None:
     print()
     print("Endpoints:")
     print("  Dashboard  : http://localhost:5001/")
+    print("  Login      : http://localhost:5001/login")
     print("  Health     : http://localhost:5001/health")
     print("  Metrics    : http://localhost:5001/metrics")
     print("=" * 60)
 
->>>>>>> cea6978 (Reconnected project and updated files)
 
 if __name__ == "__main__":
     main()

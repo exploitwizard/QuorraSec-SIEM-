@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session
-from flask_cors import CORS
-from threading import Thread
-from functools import wraps
-from datetime import datetime, timedelta
-import json, time, websocket
-=======
 # app/main.py
 import time
 import json
@@ -24,7 +16,6 @@ from flask import (
 )
 from flask_cors import CORS
 from flask_sock import Sock
->>>>>>> cea6978 (Reconnected project and updated files)
 
 from app.config import Config
 from app.database import init_db, db
@@ -32,33 +23,6 @@ from app.rules_engine import RulesEngine
 from app.log_collector import LogCollector
 from app.alert_system import AlertSystem
 from app.models import LogEntry, Alert, Attack, IPBlocklist, QuorraUser
-<<<<<<< HEAD
-
-# -------------------------------------------------
-# Flask App
-# -------------------------------------------------
-app = Flask(__name__)
-app.config.from_object(Config)
-app.secret_key = "quorra-secret-key"   # REQUIRED
-CORS(app)
-
-with app.app_context():
-    init_db(app)
-
-# -------------------------------------------------
-# Components
-# -------------------------------------------------
-rules_engine = RulesEngine()
-log_collector = LogCollector()
-alert_system = AlertSystem()
-
-monitoring_active = True
-ws_connected = False
-
-# -------------------------------------------------
-# Auth Decorator
-# -------------------------------------------------
-=======
 from app.metrics import (
     PROMETHEUS_AVAILABLE,
     HTTP_REQUESTS_TOTAL, HTTP_REQUEST_DURATION,
@@ -175,7 +139,6 @@ MAX_GEO_CACHE     = 1000
 # =============================================================================
 # Auth helpers
 # =============================================================================
->>>>>>> cea6978 (Reconnected project and updated files)
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -184,23 +147,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-<<<<<<< HEAD
-# -------------------------------------------------
-# Auth Routes
-# -------------------------------------------------
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        user = QuorraUser.query.filter_by(
-            username=request.form.get("username"),
-            is_active=True
-        ).first()
-
-        if user and user.check_password(request.form.get("password")):
-            session["user"] = user.username
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-=======
 
 def _get_current_user() -> QuorraUser | None:
     username = session.get("user")
@@ -258,27 +204,18 @@ def login():
 
             if user.password_change_required:
                 return redirect(url_for("change_password"))
->>>>>>> cea6978 (Reconnected project and updated files)
             return redirect(url_for("dashboard"))
 
         return render_template("login.html", error="Invalid credentials")
 
     return render_template("login.html")
 
-<<<<<<< HEAD
-=======
 
->>>>>>> cea6978 (Reconnected project and updated files)
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-<<<<<<< HEAD
-# -------------------------------------------------
-# UI Routes
-# -------------------------------------------------
-=======
 
 @app.route("/change-password", methods=["GET", "POST"])
 @login_required
@@ -383,7 +320,6 @@ def api_totp_disable():
 # UI ROUTES
 # =============================================================================
 
->>>>>>> cea6978 (Reconnected project and updated files)
 @app.route("/")
 @app.route("/dashboard")
 @login_required
@@ -394,16 +330,6 @@ def dashboard():
         logs=LogEntry.query.order_by(LogEntry.timestamp.desc()).limit(10).all(),
         alerts=Alert.query.order_by(Alert.created_at.desc()).limit(10).all(),
         attacks=Attack.query.order_by(Attack.detected_at.desc()).limit(10).all(),
-<<<<<<< HEAD
-        blocked_ips=IPBlocklist.query.count()
-    )
-
-@app.route("/logs")
-@login_required
-def logs_view():
-    logs = LogEntry.query.order_by(LogEntry.timestamp.desc()).all()
-    return render_template("logs.html", logs=logs)
-=======
         blocked_ips=IPBlocklist.query.count(),
     )
 
@@ -423,44 +349,16 @@ def attacks_view():
         username=session["user"],
     )
 
->>>>>>> cea6978 (Reconnected project and updated files)
 
 @app.route("/alerts")
 @login_required
 def alerts_view():
-<<<<<<< HEAD
-    return render_template("alerts.html", alerts=Alert.query.all())
-=======
     return render_template("alerts.html", alerts=Alert.query.all(), username=session["user"])
 
->>>>>>> cea6978 (Reconnected project and updated files)
 
 @app.route("/blocklist")
 @login_required
 def blocklist_view():
-<<<<<<< HEAD
-    return render_template("blocklist.html", blocked_ips=IPBlocklist.query.all())
-
-# -------------------------------------------------
-# API Routes
-# -------------------------------------------------
-@app.route("/api/stats")
-@login_required
-def api_stats():
-    return jsonify({
-        "total_logs": LogEntry.query.count(),
-        "total_alerts": Alert.query.count(),
-        "total_attacks": Attack.query.count(),
-        "blocked_ips": IPBlocklist.query.count(),
-        "monitoring_active": monitoring_active,
-        "ws_connected": ws_connected
-    })
-
-# -------------------------------------------------
-# WebSocket Logic
-# -------------------------------------------------
-def on_ws_message(ws, message):
-=======
     return render_template(
         "blocklist.html",
         blocked_ips=IPBlocklist.query.all(),
@@ -1250,19 +1148,10 @@ def sdk_view():
 # =============================================================================
 
 def on_ws_message(_ws, message):
->>>>>>> cea6978 (Reconnected project and updated files)
     try:
         data = json.loads(message)
         with app.app_context():
             log = LogEntry(
-<<<<<<< HEAD
-                ip_address=data.get("ipAddress", "unknown"),
-                attack_type=data.get("attackType"),
-                endpoint=data.get("endpoint"),
-                payload=data.get("payload"),
-                severity=data.get("severity", "medium"),
-                raw_data=json.dumps(data)
-=======
                 ip_address  = data.get("ipAddress",  "unknown"),
                 attack_type = data.get("attackType", "unknown"),
                 endpoint    = data.get("endpoint",   "unknown"),
@@ -1270,35 +1159,10 @@ def on_ws_message(_ws, message):
                 severity    = data.get("severity",   "medium"),
                 raw_data    = json.dumps(data),
                 timestamp   = datetime.utcnow(),
->>>>>>> cea6978 (Reconnected project and updated files)
             )
             db.session.add(log)
             db.session.commit()
     except Exception as e:
-<<<<<<< HEAD
-        print("WS error:", e)
-
-def connect_websocket():
-    global ws_connected
-    while monitoring_active:
-        try:
-            ws = websocket.WebSocketApp(
-                Config.BLOCK_FORTRESS_WS_URL,
-                on_message=on_ws_message
-            )
-            ws_connected = True
-            ws.run_forever()
-        except Exception:
-            ws_connected = False
-            time.sleep(Config.WS_RECONNECT_DELAY)
-
-Thread(target=connect_websocket, daemon=True).start()
-
-print("Quorra SIEM running")
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
-=======
         logger.error("WS message error: %s", e)
 
 
@@ -1357,4 +1221,3 @@ print("Quorra SIEM v2.0.0 ready")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=False)
->>>>>>> cea6978 (Reconnected project and updated files)
