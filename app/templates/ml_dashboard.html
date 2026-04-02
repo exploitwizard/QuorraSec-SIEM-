@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quorra SIEM - ML Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+        .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px;}
+        .stat-box{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:20px;text-align:center;}
+        .stat-num{font-size:2rem;font-weight:700;color:#a78bfa;}
+        .stat-lbl{font-size:.8rem;color:#9ca3af;margin-top:4px;}
+        .risk-bar-bg{background:rgba(255,255,255,.07);border-radius:99px;height:8px;overflow:hidden;}
+        .risk-bar{height:8px;border-radius:99px;background:linear-gradient(90deg,#6366f1,#a78bfa);}
+        .badge-ok{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:99px;padding:2px 10px;font-size:.72rem;}
+        .badge-warn{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.3);border-radius:99px;padding:2px 10px;font-size:.72rem;}
+        .badge-off{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.3);border-radius:99px;padding:2px 10px;font-size:.72rem;}
+        .entity-row{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+        .entity-row:last-child{border-bottom:none;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/dashboard"><i class="fas fa-shield-alt me-2 text-indigo-400"></i>Quorra SIEM</a>
+        <div class="navbar-nav ms-auto flex-row gap-3 align-items-center">
+            <a class="nav-link" href="/dashboard"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</a>
+            <a class="nav-link" href="/logs"><i class="fas fa-list me-1"></i>Logs</a>
+            <a class="nav-link" href="/alerts"><i class="fas fa-bell me-1"></i>Alerts</a>
+            <a class="nav-link" href="/attacks"><i class="fas fa-crosshairs me-1"></i>Attacks</a>
+            <a class="nav-link" href="/blocklist"><i class="fas fa-ban me-1"></i>Blocklist</a>
+            <a class="nav-link" href="/rules"><i class="fas fa-code me-1"></i>Rules</a>
+            <a class="nav-link active" href="/ml-dashboard"><i class="fas fa-brain me-1"></i>ML</a>
+            <a class="nav-link text-danger" href="/logout"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4">
+    <div class="d-flex align-items-center mb-4">
+        <i class="fas fa-brain fa-lg me-3" style="color:#a78bfa"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">ML Dashboard</h4>
+            <small class="text-muted">Anomaly detection &amp; entity risk scoring</small>
+        </div>
+    </div>
+
+    {% if not summary %}
+    <div class="g-card text-center py-5">
+        <i class="fas fa-exclamation-circle fa-3x mb-3" style="color:#f97316"></i>
+        <h5>ML Pipeline Unavailable</h5>
+        <p class="text-muted mb-0">The ML pipeline could not be loaded. Check that model files exist in <code>data/models/</code>.</p>
+    </div>
+    {% else %}
+
+    <!-- Status row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <div class="stat-num">{{ summary.total_events_analyzed | default(0) }}</div>
+                <div class="stat-lbl">Events Analyzed</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <div class="stat-num">{{ summary.total_entities | default(0) }}</div>
+                <div class="stat-lbl">Tracked Entities</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <div class="stat-num">{{ summary.ueba_profiles | default(0) }}</div>
+                <div class="stat-lbl">UEBA Profiles</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <div class="stat-num">
+                    {% if summary.models_loaded %}
+                        <span class="badge-ok"><i class="fas fa-check-circle me-1"></i>Loaded</span>
+                    {% else %}
+                        <span class="badge-warn"><i class="fas fa-exclamation-triangle me-1"></i>Partial</span>
+                    {% endif %}
+                </div>
+                <div class="stat-lbl mt-2">Model Status</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Capabilities -->
+    <div class="g-card mb-4">
+        <h6 class="fw-semibold mb-3"><i class="fas fa-microchip me-2 text-purple-400"></i>ML Capabilities</h6>
+        <div class="row g-2">
+            <div class="col-auto">
+                {% if summary.sklearn_available %}
+                    <span class="badge-ok"><i class="fas fa-check me-1"></i>scikit-learn</span>
+                {% else %}
+                    <span class="badge-off"><i class="fas fa-times me-1"></i>scikit-learn not installed</span>
+                {% endif %}
+            </div>
+            <div class="col-auto">
+                {% if summary.models_loaded %}
+                    <span class="badge-ok"><i class="fas fa-check me-1"></i>Anomaly Detector</span>
+                {% else %}
+                    <span class="badge-warn"><i class="fas fa-exclamation me-1"></i>Anomaly Detector (untrained)</span>
+                {% endif %}
+            </div>
+            <div class="col-auto">
+                <span class="badge-ok"><i class="fas fa-check me-1"></i>UEBA Engine</span>
+            </div>
+            <div class="col-auto">
+                <span class="badge-ok"><i class="fas fa-check me-1"></i>Risk Scorer</span>
+            </div>
+            <div class="col-auto">
+                <span class="badge-ok"><i class="fas fa-check me-1"></i>Graph Analyzer</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top risky entities -->
+    <div class="g-card">
+        <h6 class="fw-semibold mb-3"><i class="fas fa-exclamation-triangle me-2" style="color:#f97316"></i>Top Risky Entities</h6>
+        {% set entities = summary.top_risky_entities | default([]) %}
+        {% if entities %}
+            {% for entity in entities %}
+            <div class="entity-row">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="font-monospace" style="font-size:.85rem;">{{ entity.entity_id | default(entity[0] | default('unknown')) }}</span>
+                    <span style="font-size:.8rem;color:#a78bfa;font-weight:600;">
+                        {{ (entity.score | default(entity[1] | default(0)) * 100) | round(1) }}%
+                    </span>
+                </div>
+                <div class="risk-bar-bg">
+                    <div class="risk-bar" style="width:{{ ((entity.score | default(entity[1] | default(0))) * 100) | round(1) }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i>No risky entities detected yet. Risk scores build up as events are ingested.</p>
+        {% endif %}
+    </div>
+
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
