@@ -427,7 +427,9 @@ def main():
     from app.main import app
     from app.config import Config
 
-    port = args.port if args.port else find_free_port()
+    # Render (and other PaaS) inject PORT via environment variable
+    render_port = int(os.environ.get("PORT", 0))
+    port = args.port if args.port else render_port or find_free_port()
     scheme = "https" if (args.tls or Config.TLS_ENABLED) else "http"
     url    = f"{scheme}://localhost:{port}"
 

@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: courra-sec
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+
+    # Render sets PORT automatically — the app reads it via os.environ["PORT"]
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render auto-generates a secure random value
+
+      - key: COURRA_SEC_USERNAME
+        value: user-courra-sec
+
+      - key: COURRA_SEC_PASSWORD
+        value: courra-sec@1000       # Change this after first login!
+
+      - key: FORCE_PASSWORD_CHANGE
+        value: "true"
+
+      - key: SESSION_COOKIE_SECURE
+        value: "true"                # HTTPS is enforced on Render
+
+      - key: INGEST_API_KEY
+        generateValue: true          # Auto-generate a strong API key
+
+      - key: METRICS_ENABLED
+        value: "true"
+
+      - key: SYSLOG_LISTENER_ENABLED
+        value: "false"               # UDP/TCP syslog not supported on Render free tier
+
+      - key: BLOCK_FORTRESS_URL
+        value: ""                    # Set to your Block Fortress URL if applicable
+
+      - key: SLACK_WEBHOOK_URL
+        value: ""
+
+      - key: ALERT_WEBHOOK_URL
+        value: ""
+
+      - key: TEAMS_WEBHOOK_URL
+        value: ""
+
+      - key: MAXMIND_LICENSE_KEY
+        value: ""                    # Optional: for GeoIP lookups
+
+    disk:
+      name: courra-sec-data
+      mountPath: /app/data
+      sizeGB: 1                      # Persistent disk for SQLite DB & ML models
