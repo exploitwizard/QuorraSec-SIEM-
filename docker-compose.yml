@@ -1,6 +1,6 @@
 version: "3.9"
 
-# Quorra SIEM — Docker Compose deployment
+# Courra-Sec — Docker Compose deployment
 # Works on Windows (Docker Desktop), Linux, and macOS.
 #
 # Quick start:
@@ -12,12 +12,12 @@ version: "3.9"
 #   docker-compose up -d
 
 services:
-  quorra:
+  courra-sec:
     build:
       context: .
       dockerfile: Dockerfile
-    image: quorra-siem:2.0.0
-    container_name: quorra-siem
+    image: courra-sec:2.0.0
+    container_name: courra-sec
     restart: unless-stopped
 
     ports:
@@ -27,15 +27,15 @@ services:
 
     volumes:
       # Persist database and trained ML models between restarts
-      - quorra-data:/app/data
+      - courra-sec-data:/app/data
       # Persist log files
-      - quorra-logs:/app/logs
+      - courra-sec-logs:/app/logs
 
     environment:
       # Override any Config value via environment variables.
       # Copy .env.example to .env and docker-compose will load it automatically.
-      - QUORRA_USERNAME=${QUORRA_USERNAME:-user-quorra}
-      - QUORRA_PASSWORD=${QUORRA_PASSWORD:-quorra@1000}
+      - COURRA_SEC_USERNAME=${COURRA_SEC_USERNAME:-user-courra-sec}
+      - COURRA_SEC_PASSWORD=${COURRA_SEC_PASSWORD:-courra-sec@1000}
       - SECRET_KEY=${SECRET_KEY:-}
       - INGEST_API_KEY=${INGEST_API_KEY:-}
       - BLOCK_FORTRESS_URL=${BLOCK_FORTRESS_URL:-http://host.docker.internal:5000}
@@ -62,7 +62,7 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  quorra-data:
+  courra-sec-data:
     driver: local
-  quorra-logs:
+  courra-sec-logs:
     driver: local

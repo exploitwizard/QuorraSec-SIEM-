@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courra-Sec — Organisation Settings</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root{--navy:#0e0e1a;--cyan:#22d3ee;--magenta:#e879f9;--purple:#a78bfa;--border:rgba(255,255,255,.09);}
+        body{background:var(--navy);color:#e5e7eb;font-family:'Segoe UI',sans-serif;min-height:100vh;}
+        .navbar{background:#0a0a14!important;border-bottom:1px solid var(--border);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .nav-link.active{color:var(--purple)!important;}
+        .page-header{padding:32px 0 16px;border-bottom:1px solid var(--border);margin-bottom:28px;}
+        .page-header h2{font-size:1.4rem;font-weight:800;color:#fff;}
+        .g-card{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px;}
+        .g-card h4{font-size:.95rem;font-weight:700;color:#fff;margin-bottom:4px;}
+        .sec-lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;font-weight:600;margin-bottom:12px;display:block;}
+        .form-label{color:rgba(255,255,255,.6);font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+        .form-control{background:rgba(255,255,255,.05);border:1px solid var(--border);color:#fff;border-radius:8px;}
+        .form-control:focus{background:rgba(255,255,255,.07);border-color:rgba(34,211,238,.4);color:#fff;box-shadow:none;}
+        .form-control[readonly]{color:rgba(255,255,255,.35);cursor:default;}
+        .api-key-row{display:flex;align-items:center;gap:10px;background:#070710;border:1px solid rgba(34,211,238,.2);border-radius:9px;padding:12px 16px;}
+        .api-key-display{font-family:'Courier New',monospace;font-size:.9rem;color:var(--cyan);flex:1;word-break:break-all;}
+        .btn-act{background:rgba(255,255,255,.05);border:1px solid var(--border);color:rgba(255,255,255,.6);padding:6px 12px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap;}
+        .btn-act:hover{background:rgba(255,255,255,.1);color:#fff;}
+        .btn-act.cyan{background:rgba(34,211,238,.1);border-color:rgba(34,211,238,.25);color:var(--cyan);}
+        .usage-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px;}
+        .usage-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--cyan),var(--purple));}
+        .usage-fill.warn{background:linear-gradient(90deg,#f97316,#eab308);}
+        .usage-fill.full{background:#ef4444;}
+        .danger-zone{border-color:rgba(239,68,68,.3);}
+        .danger-zone h4{color:#fca5a5;}
+        .btn-danger{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:8px 18px;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;}
+        .btn-danger:hover{background:rgba(239,68,68,.2);}
+        .btn-save{background:linear-gradient(135deg,var(--cyan),var(--purple));color:#0e0e1a;font-weight:700;font-size:.85rem;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;transition:.2s;}
+        .btn-save:hover{opacity:.9;}
+        .modal-content{background:#13131f;border:1px solid var(--border);}
+        .modal-header,.modal-footer{border-color:var(--border);}
+        .modal-title{color:#fff;}
+        #apiKeyTimer{font-size:.72rem;color:#eab308;margin-top:6px;display:none;}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="/dashboard">
+            <i class="fas fa-shield-alt me-2" style="color:var(--cyan)"></i>COURRA-SEC SIEM
+        </a>
+        <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <span class="text-secondary me-2" style="font-size:.8rem">{{ g_username }}</span>
+            <a class="nav-link px-2" href="/dashboard"><i class="fas fa-chart-line me-1"></i>Dashboard</a>
+            <a class="nav-link px-2" href="/settings/team"><i class="fas fa-users me-1"></i>Team</a>
+            <a class="nav-link active px-2" href="/settings/organisation"><i class="fas fa-cog me-1"></i>Settings</a>
+            <a class="nav-link px-2 text-warning" href="/logout"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4" style="max-width:900px;">
+    <div class="page-header">
+        <h2><i class="fas fa-cog me-2" style="color:var(--cyan)"></i>Organisation Settings</h2>
+        <p style="color:rgba(255,255,255,.4);font-size:.85rem;margin:0">{{ org.name }} &nbsp;·&nbsp; {{ org.slug }}</p>
+    </div>
+
+    {% if message %}
+    <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:10px 16px;color:#86efac;font-size:.85rem;margin-bottom:16px;">
+        <i class="fas fa-check-circle me-2"></i>{{ message }}
+    </div>
+    {% endif %}
+
+    <!-- Organisation details -->
+    <div class="g-card">
+        <span class="sec-lbl">Organisation Details</span>
+        <form method="POST" action="/api/org/update" id="orgForm">
+            <div class="mb-3">
+                <label class="form-label">Organisation Name</label>
+                <input type="text" class="form-control" name="name" value="{{ org.name }}"
+                       {% if g_role not in ('owner', 'admin') %}readonly{% endif %}>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Slug (URL identifier)</label>
+                <input type="text" class="form-control" value="{{ org.slug }}" readonly>
+                <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-top:4px">Slug is permanent and cannot be changed after creation.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Owner Email</label>
+                <input type="email" class="form-control" name="owner_email" value="{{ org.owner_email }}"
+                       {% if g_role != 'owner' %}readonly{% endif %}>
+            </div>
+            {% if g_role in ('owner', 'admin') %}
+            <button type="submit" class="btn-save"><i class="fas fa-save me-1"></i>Save Changes</button>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- API Key -->
+    <div class="g-card">
+        <span class="sec-lbl">API Key</span>
+        <p style="font-size:.85rem;color:rgba(255,255,255,.45);margin-bottom:14px">
+            This key authenticates all SDK log ingestion. Keep it secure.
+        </p>
+        <div class="api-key-row">
+            <div class="api-key-display" id="apiKeyDisplay">{{ masked_key }}</div>
+            <button class="btn-act cyan" onclick="revealKey()" id="revealBtn"><i class="fas fa-eye me-1"></i>Reveal</button>
+            <button class="btn-act" onclick="copyKey()"><i class="fas fa-copy me-1"></i>Copy</button>
+        </div>
+        <div id="apiKeyTimer"></div>
+        {% if g_role == 'owner' %}
+        <div style="margin-top:14px;">
+            <button class="btn-danger" onclick="showRegenModal()"><i class="fas fa-sync-alt me-1"></i>Regenerate API Key</button>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-top:6px">
+                <i class="fas fa-exclamation-triangle me-1" style="color:#f97316"></i>
+                Regenerating immediately invalidates the current key. Update your SDK integrations.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Usage stats -->
+    <div class="g-card">
+        <span class="sec-lbl">Usage Statistics</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;">
+            <div>
+                <div style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:4px">Logs today</div>
+                <div style="font-size:1.4rem;font-weight:700;color:var(--cyan)">{{ usage_today | default(0) }}</div>
+                <div style="font-size:.75rem;color:rgba(255,255,255,.3)">of {{ org.max_logs_per_day | default(10000) }} daily limit</div>
+                <div class="usage-bar">
+                    <div class="usage-fill {{ 'warn' if (usage_today / org.max_logs_per_day) > 0.8 else '' }}" style="width:{{ [(usage_today / org.max_logs_per_day * 100)|int, 100]|min if org.max_logs_per_day else 0 }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:4px">Total logs stored</div>
+                <div style="font-size:1.4rem;font-weight:700;color:var(--purple)">{{ total_logs | default(0) }}</div>
+                <div style="font-size:.75rem;color:rgba(255,255,255,.3)">All time</div>
+            </div>
+            <div>
+                <div style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:4px">Active users</div>
+                <div style="font-size:1.4rem;font-weight:700;color:#86efac">{{ active_users | default(0) }}</div>
+                <div style="font-size:.75rem;color:rgba(255,255,255,.3)">of {{ org.max_users }} seats</div>
+                <div class="usage-bar">
+                    <div class="usage-fill {{ 'warn' if active_users >= org.max_users else '' }}" style="width:{{ [(active_users / org.max_users * 100)|int, 100]|min if org.max_users else 0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if g_role == 'owner' %}
+    <!-- Danger zone -->
+    <div class="g-card danger-zone">
+        <span class="sec-lbl" style="color:rgba(239,68,68,.6)">Danger Zone</span>
+        <h4>Delete Organisation</h4>
+        <p style="font-size:.85rem;color:rgba(255,255,255,.4);margin:8px 0 14px">
+            Permanently deletes your organisation, all users, all logs, alerts, and settings. This action cannot be undone.
+            All data will be exported as JSON before deletion.
+        </p>
+        <button class="btn-danger" onclick="showDeleteModal()">
+            <i class="fas fa-trash me-1"></i>Delete Organisation
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Regenerate Key Modal -->
+<div class="modal fade" id="regenModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-sync-alt me-2" style="color:#f97316"></i>Regenerate API Key</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:rgba(255,255,255,.6)">Type <strong style="color:#fff">REGENERATE</strong> to confirm. This immediately invalidates your current key.</p>
+                <input type="text" class="form-control" id="regenConfirm" placeholder="Type REGENERATE">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-danger" onclick="doRegen()">Regenerate Key</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="color:#fca5a5"><i class="fas fa-exclamation-triangle me-2"></i>Delete Organisation</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:rgba(255,255,255,.6)">Type <strong style="color:#fff">{{ org.name }}</strong> to confirm deletion.</p>
+                <input type="text" class="form-control" id="deleteConfirm" placeholder="{{ org.name }}">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-danger" onclick="doDelete()">Delete Everything</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const ORG_NAME = {{ org.name | tojson }};
+let fullKey = null;
+let revealTimer = null;
+
+function revealKey() {
+    if (fullKey) { hideKey(); return; }
+    fetch('/api/org/reveal-key').then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        fullKey = d.api_key;
+        document.getElementById('apiKeyDisplay').textContent = fullKey;
+        document.getElementById('revealBtn').innerHTML = '<i class="fas fa-eye-slash me-1"></i>Hide';
+        const timer = document.getElementById('apiKeyTimer');
+        timer.style.display = 'block';
+        let secs = 30;
+        timer.textContent = `Key visible for ${secs}s`;
+        revealTimer = setInterval(() => {
+            secs--;
+            timer.textContent = `Key visible for ${secs}s`;
+            if (secs <= 0) hideKey();
+        }, 1000);
+    });
+}
+
+function hideKey() {
+    clearInterval(revealTimer);
+    fullKey = null;
+    document.getElementById('apiKeyDisplay').textContent = {{ masked_key | tojson }};
+    document.getElementById('revealBtn').innerHTML = '<i class="fas fa-eye me-1"></i>Reveal';
+    document.getElementById('apiKeyTimer').style.display = 'none';
+}
+
+function copyKey() {
+    const key = fullKey || document.getElementById('apiKeyDisplay').textContent.trim();
+    navigator.clipboard.writeText(key);
+}
+
+function showRegenModal() { new bootstrap.Modal(document.getElementById('regenModal')).show(); }
+function showDeleteModal() { new bootstrap.Modal(document.getElementById('deleteModal')).show(); }
+
+function doRegen() {
+    if (document.getElementById('regenConfirm').value !== 'REGENERATE') {
+        alert('Type REGENERATE exactly to confirm.'); return;
+    }
+    fetch('/api/org/regenerate-key', {method:'POST'}).then(r => r.json()).then(d => {
+        if (d.ok) location.reload();
+        else alert(d.error);
+    });
+}
+
+function doDelete() {
+    if (document.getElementById('deleteConfirm').value !== ORG_NAME) {
+        alert('Organisation name does not match.'); return;
+    }
+    fetch('/api/org/delete', {method:'DELETE'}).then(r => r.json()).then(d => {
+        if (d.ok) { window.location.href = '/'; }
+        else alert(d.error);
+    });
+}
+</script>
+</body>
+</html>

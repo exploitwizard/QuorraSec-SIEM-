@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Courra-Sec — Playbooks</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+.navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+.nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}.nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:16px;}
+.sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:6px;font-weight:600;}
+.form-control,.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+.form-select option{background:#1f2937;}
+.pb-row{border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px;margin-bottom:10px;transition:.15s;}
+.pb-row:hover{background:rgba(255,255,255,.03);}
+.pb-row.disabled{opacity:.5;}
+.action-chip{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);color:#c7d2fe;padding:2px 8px;border-radius:99px;font-size:.65rem;margin:2px;}
+.toggle-btn{background:none;border:none;padding:0;cursor:pointer;}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM</a>
+    <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+        <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+        <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+        <a class="nav-link px-2" href="/alerts">Alerts</a>
+        <a class="nav-link px-2" href="/cases">Cases</a>
+        <a class="nav-link active px-2" href="/playbooks"><i class="fas fa-robot me-1"></i>Playbooks</a>
+        <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+    </div>
+</div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-0"><i class="fas fa-robot me-2" style="color:#a78bfa"></i>Playbooks</h1>
+        <p class="text-secondary mb-0" style="font-size:.8rem">Automated SOAR response: trigger actions when alerts match conditions</p>
+    </div>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newModal"><i class="fas fa-plus me-1"></i>New Playbook</button>
+</div>
+
+<!-- Action types reference -->
+<div class="g-card py-3 px-4" style="border-color:rgba(168,85,247,.2);background:rgba(168,85,247,.04)">
+    <div class="sec-head" style="color:#a78bfa">Available actions</div>
+    <div class="d-flex flex-wrap gap-1">
+        <span class="action-chip">block_ip</span><span class="action-chip">unblock_ip</span><span class="action-chip">send_slack</span>
+        <span class="action-chip">send_webhook</span><span class="action-chip">send_email</span><span class="action-chip">create_case</span>
+        <span class="action-chip">add_to_case</span><span class="action-chip">disable_user</span><span class="action-chip">create_jira</span>
+        <span class="action-chip">create_pagerduty</span>
+    </div>
+</div>
+
+<div id="pbList"><div class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm"></div></div></div>
+
+{% for pb in playbooks %}
+<div class="pb-row {{ '' if pb.enabled else 'disabled' }}" id="pb_{{ pb.id }}">
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <span class="fw-semibold">{{ pb.name }}</span>
+            {% if not pb.enabled %}<span class="badge ms-2 text-secondary" style="font-size:.62rem">DISABLED</span>{% endif %}
+            <div class="mt-1 text-secondary" style="font-size:.78rem">{{ pb.description or '' }}</div>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <small class="text-secondary">Runs: {{ pb.run_count or 0 }}</small>
+            <button class="toggle-btn" onclick="togglePb({{ pb.id }})">
+                <i class="fas fa-power-off" style="color:{{ '#22c55e' if pb.enabled else '#6b7280' }}"></i>
+            </button>
+            <button class="toggle-btn text-secondary" onclick="showRuns({{ pb.id }})"><i class="fas fa-history"></i></button>
+            <button class="toggle-btn text-danger" onclick="deletePb({{ pb.id }})"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+    <div class="mt-2" style="font-size:.72rem;color:#6b7280">
+        {% if pb.trigger_on %}
+        <i class="fas fa-bolt me-1 text-warning"></i>Trigger: <code style="font-size:.7rem;color:#fde68a">{{ pb.trigger_on }}</code>
+        {% endif %}
+    </div>
+    <div class="mt-1">
+        {% if pb.actions %}
+        {% set acts = pb.actions | from_json if pb.actions else [] %}
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div id="emptyPb" class="text-center py-5 text-secondary"><i class="fas fa-robot fa-2x mb-2 d-block opacity-25"></i>No playbooks yet</div>
+{% endfor %}
+</div>
+
+<!-- Runs modal -->
+<div class="modal fade" id="runsModal" tabindex="-1">
+<div class="modal-dialog modal-lg"><div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+    <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+        <h5 class="modal-title"><i class="fas fa-history me-2"></i>Playbook Run History</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body" id="runsBody"><div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div></div>
+</div></div>
+</div>
+
+<!-- New playbook modal -->
+<div class="modal fade" id="newModal" tabindex="-1">
+<div class="modal-dialog modal-lg"><div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+    <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+        <h5 class="modal-title"><i class="fas fa-plus me-2" style="color:#a78bfa"></i>New Playbook</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+        <div class="mb-3"><label class="sec-head">Name *</label><input type="text" class="form-control" id="pbName" placeholder="e.g. Block & Case on Critical Alert"></div>
+        <div class="mb-3"><label class="sec-head">Description</label><textarea class="form-control" id="pbDesc" rows="2"></textarea></div>
+
+        <div class="mb-3">
+            <label class="sec-head">Trigger Conditions</label>
+            <div class="row g-2">
+                <div class="col-6">
+                    <label style="font-size:.72rem;color:#9ca3af">Severity (comma-separated)</label>
+                    <input type="text" class="form-control" id="tSev" placeholder="high,critical">
+                </div>
+                <div class="col-6">
+                    <label style="font-size:.72rem;color:#9ca3af">Alert type contains</label>
+                    <input type="text" class="form-control" id="tType" placeholder="e.g. bruteforce">
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="sec-head mb-0">Actions (executed in order)</span>
+                <select class="form-select form-select-sm" id="actionPicker" style="width:200px" onchange="addAction()">
+                    <option value="">+ Add action…</option>
+                    <option value="block_ip">block_ip</option>
+                    <option value="create_case">create_case</option>
+                    <option value="send_slack">send_slack</option>
+                    <option value="send_webhook">send_webhook</option>
+                    <option value="create_jira">create_jira</option>
+                    <option value="create_pagerduty">create_pagerduty</option>
+                    <option value="disable_user">disable_user</option>
+                </select>
+            </div>
+            <div id="actionsContainer"></div>
+        </div>
+        <div id="pbErr" class="alert alert-danger" style="display:none"></div>
+    </div>
+    <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="createPlaybook()">Create Playbook</button>
+    </div>
+</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let actions = [];
+
+function addAction() {
+    const type = document.getElementById('actionPicker').value;
+    if(!type) return;
+    document.getElementById('actionPicker').value = '';
+    const idx = actions.length;
+    actions.push({type});
+
+    const extraFields = {
+        send_slack:      `<input type="text" class="form-control form-control-sm mt-1" placeholder="Slack webhook URL (optional)" onchange="actions[${idx}].webhook_url=this.value">`,
+        send_webhook:    `<input type="text" class="form-control form-control-sm mt-1" placeholder="Webhook URL *" onchange="actions[${idx}].url=this.value">`,
+        create_jira:     `<div class="row g-1 mt-1"><div class="col-6"><input type="text" class="form-control form-control-sm" placeholder="Jira URL" onchange="actions[${idx}].jira_url=this.value"></div><div class="col-3"><input type="text" class="form-control form-control-sm" placeholder="Project" value="SEC" onchange="actions[${idx}].project=this.value"></div><div class="col-3"><input type="password" class="form-control form-control-sm" placeholder="Token" onchange="actions[${idx}].token=this.value"></div></div>`,
+        create_pagerduty:`<input type="password" class="form-control form-control-sm mt-1" placeholder="PagerDuty routing_key" onchange="actions[${idx}].routing_key=this.value">`,
+        disable_user:    `<input type="text" class="form-control form-control-sm mt-1" placeholder="Username to disable" onchange="actions[${idx}].username=this.value">`,
+    };
+
+    const div = document.createElement('div');
+    div.className = 'd-flex align-items-start gap-2 mb-2 p-2 rounded' ;
+    div.style.background = 'rgba(255,255,255,.03)';
+    div.style.border = '1px solid rgba(255,255,255,.08)';
+    div.innerHTML = `
+    <div class="flex-fill">
+        <span class="action-chip">${type}</span>
+        ${extraFields[type] || ''}
+    </div>
+    <button class="btn btn-sm text-danger p-0 mt-1" onclick="removeAction(${idx},this.parentElement)"><i class="fas fa-times"></i></button>`;
+    document.getElementById('actionsContainer').appendChild(div);
+}
+
+function removeAction(idx, el) {
+    actions[idx] = null;
+    el.remove();
+}
+
+function createPlaybook() {
+    const name = document.getElementById('pbName').value.trim();
+    if(!name) { showErr('Name is required'); return; }
+
+    const sevRaw = document.getElementById('tSev').value.trim();
+    const trigger_on = {};
+    if(sevRaw) trigger_on.severity = sevRaw.split(',').map(s=>s.trim());
+    const ttype = document.getElementById('tType').value.trim();
+    if(ttype) trigger_on.alert_type = ttype;
+
+    const cleanActions = actions.filter(Boolean);
+
+    fetch('/api/playbooks', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name, description: document.getElementById('pbDesc').value, trigger_on, actions: cleanActions})
+    }).then(r=>r.json()).then(d=>{
+        if(d.ok){ bootstrap.Modal.getInstance(document.getElementById('newModal')).hide(); location.reload(); }
+        else showErr(d.error);
+    });
+}
+
+function showErr(msg) {
+    document.getElementById('pbErr').textContent = msg;
+    document.getElementById('pbErr').style.display = 'block';
+}
+
+function togglePb(id) {
+    fetch(`/api/playbooks/${id}/toggle`, {method:'POST'}).then(()=>location.reload());
+}
+
+function deletePb(id) {
+    if(!confirm('Delete this playbook?')) return;
+    fetch(`/api/playbooks/${id}`, {method:'DELETE'}).then(()=>location.reload());
+}
+
+function showRuns(pbId) {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('runsModal')).show();
+    fetch(`/api/playbooks/${pbId}/runs`).then(r=>r.json()).then(runs=>{
+        if(!runs.length) { document.getElementById('runsBody').innerHTML='<div class="text-center py-3 text-secondary">No runs yet</div>'; return; }
+        document.getElementById('runsBody').innerHTML = `<table class="table table-sm" style="font-size:.78rem">
+        <thead><tr class="text-secondary"><th>Started</th><th>Triggered By</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody>${runs.map(r=>`
+        <tr>
+            <td>${r.started_at ? r.started_at.substring(0,19).replace('T',' ') : '—'}</td>
+            <td><code style="font-size:.72rem">${escHtml(r.triggered_by||'')}</code></td>
+            <td><span class="badge" style="background:${r.status==='success'?'rgba(34,197,94,.2)':'rgba(239,68,68,.2)'};color:${r.status==='success'?'#86efac':'#fca5a5'}">${r.status}</span></td>
+            <td><button class="btn btn-sm p-0 text-secondary" onclick="alert(JSON.stringify(JSON.parse(this.dataset.log||'[]'),null,2))" data-log='${escHtml(r.execution_log||"[]")}'><i class="fas fa-list-alt"></i></button></td>
+        </tr>`).join('')}</tbody></table>`;
+    });
+}
+</script>
+</body>
+</html>

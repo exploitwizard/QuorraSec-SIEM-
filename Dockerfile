@@ -1,4 +1,4 @@
-# Quorra SIEM — Multi-stage Docker image
+# Courra-Sec — Multi-stage Docker image
 # Works on Linux containers (amd64 / arm64)
 
 FROM python:3.11-slim AS base
@@ -27,13 +27,13 @@ RUN mkdir -p data/geolite data/models data/tls logs \
 EXPOSE 5001 5140/udp 5141/tcp
 
 # Run as non-root user for security
-RUN useradd -m -u 1000 quorra \
- && chown -R quorra:quorra /app
-USER quorra
+RUN useradd -m -u 1000 courra-sec \
+ && chown -R courra-sec:courra-sec /app
+USER courra-sec
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"
 
 # Start with waitress (no interactive browser prompt in container)
-ENTRYPOINT ["python", "quorra.py", "--no-browser", "--host", "0.0.0.0"]
+ENTRYPOINT ["python", "courra-sec.py", "--no-browser", "--host", "0.0.0.0"]

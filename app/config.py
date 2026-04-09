@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 def _get_platform_data_dir() -> Path:
     try:
         from platformdirs import user_data_dir
-        d = Path(user_data_dir("QuorraSIEM", "QuorraSIEM"))
+        d = Path(user_data_dir("CourraSec", "CourraSec"))
         d.mkdir(parents=True, exist_ok=True)
         return d
     except ImportError:
@@ -23,7 +23,7 @@ def _get_platform_data_dir() -> Path:
 def _get_platform_log_dir() -> Path:
     try:
         from platformdirs import user_log_dir
-        d = Path(user_log_dir("QuorraSIEM", "QuorraSIEM"))
+        d = Path(user_log_dir("CourraSec", "CourraSec"))
         d.mkdir(parents=True, exist_ok=True)
         return d
     except ImportError:
@@ -31,7 +31,7 @@ def _get_platform_log_dir() -> Path:
 
 # ---------------------------------------------------------------------------
 # Persistent SECRET_KEY
-# Order: env var → .quorra-secret file in data dir → generate + persist
+# Order: env var → .courra-sec-secret file in data dir → generate + persist
 # This ensures sessions survive restarts without requiring manual config.
 # ---------------------------------------------------------------------------
 def _get_or_create_secret_key() -> str:
@@ -41,7 +41,7 @@ def _get_or_create_secret_key() -> str:
 
     data_dir = BASE_DIR / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    secret_file = data_dir / ".quorra-secret"
+    secret_file = data_dir / ".courra-sec-secret"
 
     if secret_file.exists():
         key = secret_file.read_text().strip()
@@ -76,7 +76,7 @@ class Config:
     # DB_PATH env var overrides the default (useful on Windows where
     # C:\Program Files is read-only).
     # -----------------------------------------------------------------------
-    _db_path = os.environ.get("DB_PATH") or str(BASE_DIR / "data" / "quorra.db")
+    _db_path = os.environ.get("DB_PATH") or str(BASE_DIR / "data" / "courra-sec.db")
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{_db_path}"
 
     # Enable WAL mode for better concurrency on all platforms
@@ -102,8 +102,8 @@ class Config:
     # -----------------------------------------------------------------------
     # Authentication
     # -----------------------------------------------------------------------
-    QUORRA_USERNAME = os.environ.get("QUORRA_USERNAME", "user-quorra")
-    QUORRA_PASSWORD = os.environ.get("QUORRA_PASSWORD", "quorra@1000")
+    COURRA_SEC_USERNAME = os.environ.get("COURRA_SEC_USERNAME", "user-courra-sec")
+    COURRA_SEC_PASSWORD = os.environ.get("COURRA_SEC_PASSWORD", "courra-sec@1000")
 
     # Force a password change on the first login for the default account.
     # Set to "false" to disable (not recommended for production).
@@ -112,7 +112,7 @@ class Config:
     # -----------------------------------------------------------------------
     # TOTP / 2FA
     # -----------------------------------------------------------------------
-    TOTP_ISSUER = os.environ.get("TOTP_ISSUER", "QuorraSIEM")
+    TOTP_ISSUER = os.environ.get("TOTP_ISSUER", "CourraSec")
     TOTP_ENABLED_DEFAULT = False   # Users opt-in via the UI
 
     # -----------------------------------------------------------------------
@@ -122,6 +122,9 @@ class Config:
     BLOCK_FORTRESS_WS_URL = os.environ.get(
         "BLOCK_FORTRESS_WS_URL", "ws://localhost:5000/api/ws/logs"
     )
+    # Optional: admin credentials for authenticated API pull from Block Fortress
+    BLOCK_FORTRESS_ADMIN_USER = os.environ.get("BLOCK_FORTRESS_ADMIN_USER", "admin")
+    BLOCK_FORTRESS_ADMIN_PASS = os.environ.get("BLOCK_FORTRESS_ADMIN_PASS", "")
 
     # -----------------------------------------------------------------------
     # Detection thresholds

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quorra SIEM Installation Script
+Courra-Sec Installation Script
 Cross-platform: Windows, Linux, macOS
 
 Usage:
@@ -105,15 +105,15 @@ def download_geoip_db(license_key):
 
 
 def create_windows_launcher():
-    """Create quorra.bat for Windows users who prefer double-click launch."""
-    bat = BASE_DIR / "quorra.bat"
+    """Create courra-sec.bat for Windows users who prefer double-click launch."""
+    bat = BASE_DIR / "courra-sec.bat"
     content = (
         "@echo off\r\n"
         "cd /d \"%~dp0\"\r\n"
         "if exist venv\\Scripts\\python.exe (\r\n"
-        "    venv\\Scripts\\python.exe quorra.py %*\r\n"
+        "    venv\\Scripts\\python.exe courra-sec.py %*\r\n"
         ") else (\r\n"
-        "    python quorra.py %*\r\n"
+        "    python courra-sec.py %*\r\n"
         ")\r\n"
     )
     bat.write_text(content)
@@ -121,15 +121,15 @@ def create_windows_launcher():
 
 
 def create_unix_launcher():
-    """Create quorra.sh for Unix/macOS convenience."""
-    sh = BASE_DIR / "quorra.sh"
+    """Create courra-sec.sh for Unix/macOS convenience."""
+    sh = BASE_DIR / "courra-sec.sh"
     content = (
         "#!/bin/sh\n"
         "cd \"$(dirname \"$0\")\"\n"
         "if [ -f venv/bin/python ]; then\n"
-        "    exec venv/bin/python quorra.py \"$@\"\n"
+        "    exec venv/bin/python courra-sec.py \"$@\"\n"
         "else\n"
-        "    exec python3 quorra.py \"$@\"\n"
+        "    exec python3 courra-sec.py \"$@\"\n"
         "fi\n"
     )
     sh.write_text(content)
@@ -139,24 +139,24 @@ def create_unix_launcher():
 
 def create_global_launcher(venv_python):
     """
-    Create a global 'quorra' command so it can be run from any terminal.
+    Create a global 'courra-sec' command so it can be run from any terminal.
 
-    On Linux/macOS: writes a wrapper shell script to ~/.local/bin/quorra
+    On Linux/macOS: writes a wrapper shell script to ~/.local/bin/courra-sec
                     (falls back to /usr/local/bin if writable).
-    On Windows:     writes quorra.bat to the user Python Scripts directory,
+    On Windows:     writes courra-sec.bat to the user Python Scripts directory,
                     which pip already adds to PATH during Python installation.
     """
-    quorra_script = BASE_DIR / "quorra.py"
+    courra-sec_script = BASE_DIR / "courra-sec.py"
 
     if sys.platform == "win32":
         # User Scripts directory (no admin required)
         scripts_dir = Path(sysconfig.get_path("scripts", "nt_user"))
         scripts_dir.mkdir(parents=True, exist_ok=True)
-        bat = scripts_dir / "quorra.bat"
+        bat = scripts_dir / "courra-sec.bat"
         bat.write_text(
             "@echo off\r\n"
             f"cd /d \"{BASE_DIR}\"\r\n"
-            f"\"{venv_python}\" \"{quorra_script}\" %*\r\n"
+            f"\"{venv_python}\" \"{courra-sec_script}\" %*\r\n"
         )
         print(f"  Global command created : {bat}")
         print(f"  Ensure this directory is in your PATH: {scripts_dir}")
@@ -169,12 +169,12 @@ def create_global_launcher(venv_python):
     ]
 
     for bin_dir in candidates:
-        wrapper = bin_dir / "quorra"
+        wrapper = bin_dir / "courra-sec"
         try:
             bin_dir.mkdir(parents=True, exist_ok=True)
             wrapper.write_text(
                 "#!/bin/sh\n"
-                f"exec \"{venv_python}\" \"{quorra_script}\" \"$@\"\n"
+                f"exec \"{venv_python}\" \"{courra-sec_script}\" \"$@\"\n"
             )
             wrapper.chmod(0o755)
             print(f"  Global command created : {wrapper}")
@@ -213,22 +213,22 @@ def create_env_template():
     if env_example.exists():
         return
     content = """\
-# Quorra SIEM - Environment Variables
+# Courra-Sec - Environment Variables
 # Copy this file to .env and fill in the values.
 
 # ---- Security (REQUIRED for production) ----
 SECRET_KEY=change-me-to-a-random-64-char-hex-string
 INGEST_API_KEY=change-me-to-a-random-api-key
-QUORRA_USERNAME=user-quorra
-QUORRA_PASSWORD=change-me-strong-password
+COURRA_SEC_USERNAME=user-courra-sec
+COURRA_SEC_PASSWORD=change-me-strong-password
 
 # ---- Block Fortress ----
 BLOCK_FORTRESS_URL=http://localhost:5000
 BLOCK_FORTRESS_WS_URL=ws://localhost:5000/api/ws/logs
 
 # ---- Database ----
-# DB_PATH=C:\\ProgramData\\QuorraSIEM\\quorra.db   # Windows example
-# DB_PATH=/var/lib/quorra/quorra.db               # Linux example
+# DB_PATH=C:\\ProgramData\\CourraSec\\courra-sec.db   # Windows example
+# DB_PATH=/var/lib/courra-sec/courra-sec.db               # Linux example
 
 # ---- Alerts / Notifications ----
 SLACK_WEBHOOK_URL=
@@ -239,7 +239,7 @@ SMTP_HOST=localhost
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
-ALERT_FROM=quorra@localhost
+ALERT_FROM=courra-sec@localhost
 ALERT_TO=admin@localhost
 
 # ---- GeoIP ----
@@ -265,7 +265,7 @@ TLS_KEY_FILE=data/tls/key.pem
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Install Quorra SIEM Tool",
+        description="Install Courra-Sec Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--geoip-key", default=os.environ.get("MAXMIND_LICENSE_KEY", ""),
@@ -273,10 +273,10 @@ def main():
     parser.add_argument("--no-venv",   action="store_true",
                         help="Skip virtual environment creation (use system Python)")
     parser.add_argument("--install-service", action="store_true",
-                        help="Install Quorra as a system service after installation")
+                        help="Install Courra-Sec as a system service after installation")
     args = parser.parse_args()
 
-    print("\nInstalling Quorra SIEM Tool...")
+    print("\nInstalling Courra-Sec Tool...")
     print("=" * 60)
 
     # --- Python version check ---
@@ -311,13 +311,13 @@ def main():
     run_command(f'{pip_cmd} install --upgrade pip --quiet')
     run_command(f'{pip_cmd} install -r "{BASE_DIR / "requirements.txt"}"')
 
-    print("\nInstalling Quorra package (editable)...")
+    print("\nInstalling Courra-Sec package (editable)...")
     run_command(f'{pip_cmd} install -e "{BASE_DIR}" --quiet')
 
     # --- Platform-specific setup ---
     if sys.platform != "win32":
         print("\nSetting file permissions...")
-        for fname in ("quorra.py", "quorra.sh"):
+        for fname in ("courra-sec.py", "courra-sec.sh"):
             fp = BASE_DIR / fname
             if fp.exists():
                 fp.chmod(0o755)
@@ -326,8 +326,8 @@ def main():
         print("\nCreating Windows launcher...")
         create_windows_launcher()
 
-    # --- Global 'quorra' command ---
-    print("\nCreating global 'quorra' command...")
+    # --- Global 'courra-sec' command ---
+    print("\nCreating global 'courra-sec' command...")
     if args.no_venv:
         venv_python = sys.executable
     else:
@@ -345,18 +345,18 @@ def main():
     # --- Service installation ---
     if args.install_service:
         print("\nInstalling system service...")
-        run_command(f'"{sys.executable}" "{BASE_DIR / "quorra.py"}" --install-service')
+        run_command(f'"{sys.executable}" "{BASE_DIR / "courra-sec.py"}" --install-service')
 
     print("\n" + "=" * 60)
     print("Installation complete!")
     print()
-    print("To start Quorra SIEM, open a NEW terminal and run:")
-    print("  quorra")
+    print("To start Courra-Sec, open a NEW terminal and run:")
+    print("  courra-sec")
     print()
     if sys.platform == "win32":
-        print("  Or double-click: quorra.bat")
+        print("  Or double-click: courra-sec.bat")
     else:
-        print("  Or run directly: ./quorra.sh")
+        print("  Or run directly: ./courra-sec.sh")
     print()
     print("Available CLI flags:")
     print("  --no-browser        Don't auto-open the browser")
@@ -366,10 +366,10 @@ def main():
     print("  --install-service   Register as OS service")
     print()
     print("Default credentials (CHANGE BEFORE PRODUCTION USE):")
-    print("  Username : user-quorra")
-    print("  Password : quorra@1000")
+    print("  Username : user-courra-sec")
+    print("  Password : courra-sec@1000")
     print()
-    print("  Set QUORRA_USERNAME, QUORRA_PASSWORD, and INGEST_API_KEY")
+    print("  Set COURRA_SEC_USERNAME, COURRA_SEC_PASSWORD, and INGEST_API_KEY")
     print("  environment variables (or copy .env.example to .env).")
     print()
     print("Endpoints:")

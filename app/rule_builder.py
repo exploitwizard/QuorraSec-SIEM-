@@ -1,6 +1,6 @@
 """
 app/rule_builder.py
-Three-level rule evaluation engine for Quorra SIEM.
+Three-level rule evaluation engine for Courra-Sec.
 
 Level 1 & 2: YAML/JSON rule definitions evaluated by RuleEvaluator
 Level 3:     Python DSL executed in a RestrictedPython sandbox

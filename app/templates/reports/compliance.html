@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Courra-Sec — {{ framework }} Compliance</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+.navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+.nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}.nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:16px;}
+.sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:6px;font-weight:600;}
+.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+.form-select option{background:#1f2937;}
+.score-ring{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;border:4px solid;}
+.ctrl-pass{background:rgba(34,197,94,.06);border-left:4px solid #22c55e;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;}
+.ctrl-fail{background:rgba(239,68,68,.06);border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM</a>
+    <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+        <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+        <a class="nav-link px-2" href="/reports">Reports</a>
+        <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+    </div>
+</div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+<div class="mb-3"><a href="/reports" class="text-secondary text-decoration-none" style="font-size:.82rem"><i class="fas fa-arrow-left me-1"></i>Back to Reports</a></div>
+
+<!-- Framework selector -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0"><i class="fas fa-clipboard-check me-2" style="color:#06b6d4"></i>{{ framework }} Compliance Report</h1>
+    <div class="d-flex gap-2 align-items-center">
+        <select class="form-select form-select-sm" onchange="window.location='/reports/compliance?framework='+this.value" style="width:140px">
+            {% for fw in frameworks %}
+            <option value="{{ fw }}" {% if fw == framework %}selected{% endif %}>{{ fw }}</option>
+            {% endfor %}
+        </select>
+        <a href="/api/reports/compliance/{{ framework }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-download me-1"></i>JSON</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <!-- Score card -->
+    <div class="col-md-3">
+        <div class="g-card text-center">
+            <div class="d-flex justify-content-center mb-3">
+                <div class="score-ring" style="border-color:{% if report.score >= 80 %}#22c55e{% elif report.score >= 50 %}#eab308{% else %}#ef4444{% endif %};color:{% if report.score >= 80 %}#22c55e{% elif report.score >= 50 %}#eab308{% else %}#ef4444{% endif %}">
+                    {{ report.score }}%
+                </div>
+            </div>
+            <div class="fw-bold mb-1">{{ report.status.replace('_',' ').title() }}</div>
+            <div class="text-secondary" style="font-size:.78rem">{{ report.passed }}/{{ report.total }} controls passing</div>
+            <div class="mt-2 text-secondary" style="font-size:.72rem">Generated: {{ report.generated_at[:16].replace('T',' ') }}</div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="col-md-9">
+        <div class="g-card">
+            <div class="sec-head">{{ report.framework }} — {{ report.description }}</div>
+            {% for ctrl in report.controls %}
+            <div class="ctrl-{{ ctrl.status }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-semibold" style="font-size:.82rem">{{ ctrl.id }}</span>
+                        <span class="ms-2 text-secondary" style="font-size:.8rem">{{ ctrl.title }}</span>
+                    </div>
+                    <span class="badge {% if ctrl.status == 'pass' %}bg-success{% else %}bg-danger{% endif %}" style="font-size:.65rem">
+                        <i class="fas {% if ctrl.status == 'pass' %}fa-check{% else %}fa-times{% endif %} me-1"></i>{{ ctrl.status.upper() }}
+                    </span>
+                </div>
+                {% if ctrl.detail %}
+                <div class="mt-1" style="font-size:.72rem;color:#9ca3af">{{ ctrl.detail }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Recommendations for failed controls -->
+{% set failed = report.controls | selectattr('status','eq','fail') | list %}
+{% if failed %}
+<div class="g-card" style="border-color:rgba(239,68,68,.2)">
+    <div class="sec-head" style="color:#ef4444">Remediation Required</div>
+    <ul class="mb-0" style="font-size:.82rem;color:#9ca3af">
+    {% for ctrl in failed %}
+        <li class="mb-1">
+            <span class="fw-semibold text-danger">{{ ctrl.id }}</span> — {{ ctrl.title }}:
+            address this control to improve compliance posture.
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

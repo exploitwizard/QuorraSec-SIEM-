@@ -1,2 +1,2 @@
 [console_scripts]
-quorra = quorra:main
+courra-sec = courra-sec:main

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quorra SIEM Tool - Main Entry Point
+Courra-Sec Tool - Main Entry Point
 Cross-platform CLI for Block Fortress integration.
 Supports Windows, Linux, and macOS.
 """
@@ -24,14 +24,14 @@ def _setup_logging(log_level: str = "INFO", log_file=None):
     if log_file is None:
         # Platform-aware log directory
         if sys.platform == "win32":
-            log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "QuorraSIEM" / "logs"
+            log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "CourraSec" / "logs"
         elif sys.platform == "darwin":
-            log_dir = Path.home() / "Library" / "Logs" / "QuorraSIEM"
+            log_dir = Path.home() / "Library" / "Logs" / "CourraSec"
         else:
-            log_dir = Path.home() / ".local" / "share" / "quorra" / "logs"
+            log_dir = Path.home() / ".local" / "share" / "courra-sec" / "logs"
 
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = str(log_dir / "quorra.log")
+        log_file = str(log_dir / "courra-sec.log")
 
     level = getattr(logging, log_level.upper(), logging.INFO)
 
@@ -139,7 +139,7 @@ def open_browser(url):
 def _setup_signals():
     """Register graceful shutdown handlers for all platforms."""
     def _handler(sig, frame):
-        print("\n\nShutting down Quorra SIEM...")
+        print("\n\nShutting down Courra-Sec...")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _handler)
@@ -285,7 +285,7 @@ def _run_server(flask_app, host, port, tls, cert_file, key_file):
 # ---------------------------------------------------------------------------
 
 def install_service():
-    """Install Quorra as a system service (systemd / launchd / Windows SCM)."""
+    """Install Courra-Sec as a system service (systemd / launchd / Windows SCM)."""
     script = Path(__file__).resolve()
 
     if sys.platform == "win32":
@@ -297,12 +297,12 @@ def install_service():
 
 
 def _install_systemd_service(script):
-    user      = os.environ.get("USER", "quorra")
+    user      = os.environ.get("USER", "courra-sec")
     work_dir  = script.parent
     exec_path = f"{sys.executable} {script} --no-browser"
 
     unit = f"""[Unit]
-Description=Quorra SIEM
+Description=Courra-Sec
 After=network.target
 
 [Service]
@@ -318,11 +318,11 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 """
-    dest = Path("/etc/systemd/system/quorra.service")
+    dest = Path("/etc/systemd/system/courra-sec.service")
     try:
         dest.write_text(unit)
         print(f"systemd service written to {dest}")
-        print("Enable with: sudo systemctl enable --now quorra")
+        print("Enable with: sudo systemctl enable --now courra-sec")
     except PermissionError:
         print("Permission denied writing to /etc/systemd/system/")
         print("Run this command as root or with sudo.")
@@ -337,7 +337,7 @@ def _install_launchd_service(script):
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>             <string>com.quorra.siem</string>
+  <key>Label</key>             <string>com.courra-sec.siem</string>
   <key>ProgramArguments</key>
   <array>
     <string>{sys.executable}</string>
@@ -347,12 +347,12 @@ def _install_launchd_service(script):
   <key>WorkingDirectory</key>  <string>{work_dir}</string>
   <key>RunAtLoad</key>         <true/>
   <key>KeepAlive</key>         <true/>
-  <key>StandardOutPath</key>   <string>{work_dir}/logs/quorra.stdout.log</string>
-  <key>StandardErrorPath</key> <string>{work_dir}/logs/quorra.stderr.log</string>
+  <key>StandardOutPath</key>   <string>{work_dir}/logs/courra-sec.stdout.log</string>
+  <key>StandardErrorPath</key> <string>{work_dir}/logs/courra-sec.stderr.log</string>
 </dict>
 </plist>
 """
-    dest = Path.home() / "Library" / "LaunchAgents" / "com.quorra.siem.plist"
+    dest = Path.home() / "Library" / "LaunchAgents" / "com.courra-sec.siem.plist"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(plist)
     print(f"launchd plist written to {dest}")
@@ -362,12 +362,12 @@ def _install_launchd_service(script):
 def _install_windows_service(script):
     print("Windows Service Installation:")
     print("  Option 1 - NSSM (recommended):")
-    print("    nssm install QuorraSIEM")
+    print("    nssm install CourraSec")
     print(f"    Application: {sys.executable}")
     print(f"    Arguments: {script} --no-browser")
     print("")
     print("  Option 2 - Task Scheduler:")
-    print("    schtasks /create /sc ONSTART /tn QuorraSIEM \\")
+    print("    schtasks /create /sc ONSTART /tn CourraSec \\")
     print(f"      /tr \"\\\"{sys.executable}\\\" \\\"{script}\\\" --no-browser\"")
 
 
@@ -377,8 +377,8 @@ def _install_windows_service(script):
 
 def build_parser():
     p = argparse.ArgumentParser(
-        prog="quorra",
-        description="Quorra SIEM - Block Fortress Security Integration",
+        prog="courra-sec",
+        description="Courra-Sec - Block Fortress Security Integration",
     )
     p.add_argument("--port",       type=int,  default=0,
                    help="Port to listen on (default: auto-select 5001-5020)")
@@ -396,7 +396,7 @@ def build_parser():
     p.add_argument("--tls",        action="store_true",
                    help="Enable HTTPS with a self-signed certificate")
     p.add_argument("--install-service", action="store_true",
-                   help="Install Quorra as a system service and exit")
+                   help="Install Courra-Sec as a system service and exit")
     return p
 
 
@@ -417,7 +417,7 @@ def main():
 
     print("""
     +---------------------------------------+
-    |          QUORRA SIEM v2.0             |
+    |          COURRA-SEC SIEM v2.0             |
     |      Block Fortress Integration       |
     |   Windows / Linux / macOS             |
     +---------------------------------------+
@@ -431,7 +431,7 @@ def main():
     scheme = "https" if (args.tls or Config.TLS_ENABLED) else "http"
     url    = f"{scheme}://localhost:{port}"
 
-    os.environ.setdefault("QUORRA_PORT", str(port))
+    os.environ.setdefault("COURRA-SEC_PORT", str(port))
     os.environ.setdefault("BLOCK_FORTRESS_URL", Config.BLOCK_FORTRESS_URL)
 
     print(f"Log file         : {log_file}")

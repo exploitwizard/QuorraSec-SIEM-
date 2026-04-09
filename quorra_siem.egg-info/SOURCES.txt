@@ -10,9 +10,9 @@ app/main.py
 app/ml.py
 app/models.py
 app/rules_engine.py
-quorra_siem.egg-info/PKG-INFO
-quorra_siem.egg-info/SOURCES.txt
-quorra_siem.egg-info/dependency_links.txt
-quorra_siem.egg-info/entry_points.txt
-quorra_siem.egg-info/requires.txt
-quorra_siem.egg-info/top_level.txt
+courra_sec.egg-info/PKG-INFO
+courra_sec.egg-info/SOURCES.txt
+courra_sec.egg-info/dependency_links.txt
+courra_sec.egg-info/entry_points.txt
+courra_sec.egg-info/requires.txt
+courra_sec.egg-info/top_level.txt

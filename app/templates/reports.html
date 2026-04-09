@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Courra-Sec — Reports</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+.navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+.nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}.nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:16px;}
+.sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:6px;font-weight:600;}
+.form-control,.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+.form-select option{background:#1f2937;}
+.stat-num{font-size:2rem;font-weight:700;line-height:1;}
+.export-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;cursor:pointer;transition:.15s;text-align:center;}
+.export-btn:hover{background:rgba(255,255,255,.07);border-color:rgba(99,102,241,.4);}
+.fw-icon{font-size:1.5rem;margin-bottom:8px;}
+.compliance-link{border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;cursor:pointer;transition:.15s;text-decoration:none;color:#e5e7eb;display:block;}
+.compliance-link:hover{border-color:rgba(6,182,212,.4);color:#06b6d4;}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM</a>
+    <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+        <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+        <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+        <a class="nav-link active px-2" href="/reports"><i class="fas fa-chart-bar me-1"></i>Reports</a>
+        <a class="nav-link px-2" href="/audit">Audit Log</a>
+        <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+    </div>
+</div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+<h1 class="h4 mb-3"><i class="fas fa-chart-bar me-2" style="color:#06b6d4"></i>Reports & Compliance</h1>
+
+<!-- Executive Summary -->
+<div class="g-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="sec-head mb-0">Executive Summary (last 7 days)</div>
+        <a href="/api/reports/export/logs?format=csv" class="btn btn-sm btn-outline-secondary"><i class="fas fa-download me-1"></i>Export Logs CSV</a>
+    </div>
+    <div class="row g-3">
+        <div class="col-6 col-md-2"><div class="text-center"><div class="stat-num" style="color:#06b6d4">{{ summary.new_logs }}</div><div class="sec-head mt-1 mb-0">New Logs</div></div></div>
+        <div class="col-6 col-md-2"><div class="text-center"><div class="stat-num text-danger">{{ summary.new_attacks }}</div><div class="sec-head mt-1 mb-0">Attacks</div></div></div>
+        <div class="col-6 col-md-2"><div class="text-center"><div class="stat-num text-warning">{{ summary.new_alerts }}</div><div class="sec-head mt-1 mb-0">Alerts</div></div></div>
+        <div class="col-6 col-md-2"><div class="text-center"><div class="stat-num" style="color:#ef4444">{{ summary.open_alerts }}</div><div class="sec-head mt-1 mb-0">Open Alerts</div></div></div>
+        <div class="col-6 col-md-2"><div class="text-center"><div class="stat-num" style="color:#f97316">{{ summary.blocked_ips }}</div><div class="sec-head mt-1 mb-0">Blocked IPs</div></div></div>
+        <div class="col-6 col-md-2"><div class="text-center">
+            <a href="/api/reports/executive-summary" class="btn btn-sm btn-outline-secondary w-100"><i class="fas fa-download me-1"></i>JSON</a>
+        </div></div>
+    </div>
+    {% if summary.top_attack_types %}
+    <div class="mt-3">
+        <div class="sec-head">Top Attack Types (7d)</div>
+        <div class="d-flex flex-wrap gap-2">
+            {% for atype, count in summary.top_attack_types.items() %}
+            <span class="badge" style="background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.25);font-size:.72rem">{{ atype }}: {{ count }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Export Downloads -->
+<div class="row g-3 mb-3">
+    <div class="col-12"><div class="sec-head">Data Exports</div></div>
+    {% for entity, label, icon, color in [
+        ('logs','Log Entries','fa-list','#06b6d4'),
+        ('alerts','Alerts','fa-bell','#f97316'),
+        ('attacks','Attacks','fa-crosshairs','#ef4444'),
+        ('audit','Audit Log','fa-clipboard-check','#a78bfa')
+    ] %}
+    <div class="col-6 col-md-3">
+        <div class="g-card py-3 text-center">
+            <div class="fw-icon"><i class="fas {{ icon }}" style="color:{{ color }}"></i></div>
+            <div class="fw-semibold mb-2">{{ label }}</div>
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="/api/reports/export/{{ entity }}?format=csv" class="btn btn-sm btn-outline-secondary flex-fill"><i class="fas fa-file-csv me-1"></i>CSV</a>
+                <a href="/api/reports/export/{{ entity }}?format=json" class="btn btn-sm btn-outline-secondary flex-fill"><i class="fas fa-file-code me-1"></i>JSON</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Compliance Frameworks -->
+<div class="g-card">
+    <div class="sec-head">Compliance Frameworks</div>
+    <p class="text-secondary mb-3" style="font-size:.8rem">Run a compliance snapshot against your org's current configuration and activity.</p>
+    <div class="row g-3">
+        {% for fw, desc, color in [
+            ('PCI-DSS','Payment Card Industry Data Security Standard','#ef4444'),
+            ('HIPAA','Health Insurance Portability and Accountability Act','#3b82f6'),
+            ('SOC2','Service Organization Control 2','#22c55e'),
+            ('ISO27001','ISO/IEC 27001 Information Security','#a78bfa')
+        ] %}
+        <div class="col-6 col-md-3">
+            <a href="/reports/compliance?framework={{ fw }}" class="compliance-link">
+                <div class="fw-bold mb-1" style="color:{{ color }}">{{ fw }}</div>
+                <div class="text-secondary" style="font-size:.72rem">{{ desc }}</div>
+                <div class="mt-2"><span class="badge" style="background:rgba(255,255,255,.06);color:#9ca3af;font-size:.65rem">View Report <i class="fas fa-arrow-right ms-1"></i></span></div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Scheduled Reports -->
+<div class="g-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="sec-head mb-0">Scheduled Reports</div>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#schedModal"><i class="fas fa-plus me-1"></i>Schedule</button>
+    </div>
+    {% if scheduled %}
+    <table class="table table-sm" style="font-size:.8rem">
+        <thead><tr class="text-secondary"><th>Name</th><th>Type</th><th>Schedule</th><th>Recipients</th><th>Last Run</th><th></th></tr></thead>
+        <tbody>
+        {% for sr in scheduled %}
+        <tr>
+            <td>{{ sr.name }}</td>
+            <td class="text-secondary">{{ sr.report_type }}</td>
+            <td class="text-secondary">{{ sr.schedule }}</td>
+            <td class="text-secondary" style="font-size:.72rem">{{ sr.recipients }}</td>
+            <td class="text-secondary">{{ sr.last_run.strftime('%Y-%m-%d') if sr.last_run else 'Never' }}</td>
+            <td><button class="btn btn-sm p-0 text-danger" onclick="deleteScheduled({{ sr.id }})"><i class="fas fa-trash"></i></button></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="text-center py-3 text-secondary" style="font-size:.82rem"><i class="fas fa-calendar fa-2x mb-2 d-block opacity-25"></i>No scheduled reports configured</div>
+    {% endif %}
+</div>
+</div>
+
+<!-- Schedule modal -->
+<div class="modal fade" id="schedModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+    <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+        <h5 class="modal-title">Schedule Report</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+        <div class="mb-2"><label class="sec-head">Name</label><input type="text" class="form-control" id="srName" placeholder="Weekly Security Report"></div>
+        <div class="mb-2"><label class="sec-head">Type</label>
+            <select class="form-select" id="srType">
+                <option value="executive_summary">Executive Summary</option>
+                <option value="full_export">Full Log Export</option>
+                <option value="compliance">Compliance Report</option>
+                <option value="attack_summary">Attack Summary</option>
+            </select>
+        </div>
+        <div class="mb-2"><label class="sec-head">Schedule</label>
+            <select class="form-select" id="srSchedule">
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+                <option value="monthly">Monthly</option>
+            </select>
+        </div>
+        <div class="mb-2"><label class="sec-head">Recipients (comma-separated emails)</label>
+            <input type="text" class="form-control" id="srRecipients" placeholder="admin@corp.com, cso@corp.com"></div>
+    </div>
+    <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="createScheduled()">Schedule</button>
+    </div>
+</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function createScheduled() {
+    const recipients = document.getElementById('srRecipients').value.split(',').map(s=>s.trim()).filter(Boolean);
+    fetch('/api/reports/scheduled', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('srName').value,
+            report_type: document.getElementById('srType').value,
+            schedule: document.getElementById('srSchedule').value,
+            recipients,
+        })
+    }).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert(d.error); });
+}
+function deleteScheduled(id) {
+    if(!confirm('Delete this scheduled report?')) return;
+    fetch(`/api/reports/scheduled/${id}`, {method:'DELETE'}).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); });
+}
+</script>
+</body>
+</html>

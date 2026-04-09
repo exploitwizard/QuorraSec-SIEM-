@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 training/train_all.py
-Train Quorra ML models on existing log data from the database.
+Train Courra-Sec ML models on existing log data from the database.
 
 Run from the project root:
     python training/train_all.py
@@ -132,7 +132,7 @@ def build_ueba_profiles(logs: list) -> int:
 
 def main():
     print("=" * 50)
-    print("Quorra ML Training")
+    print("Courra-Sec ML Training")
     print("=" * 50)
 
     with app.app_context():
@@ -178,7 +178,7 @@ def main():
         print(f"Training complete")
         print(f"  Models saved to : {MODEL_DIR}")
         print(f"  Trained at      : {meta['trained_at']}")
-        print(f"  Restart Quorra to load the trained models.")
+        print(f"  Restart Courra-Sec to load the trained models.")
         print(f"{'=' * 50}")
 
 

@@ -7,7 +7,7 @@ if readme.exists():
     long_description = readme.read_text(encoding="utf-8")
 
 setup(
-    name="quorra-siem",
+    name="courra-sec",
     version="2.0.0",
     packages=find_packages(),
     include_package_data=True,
@@ -62,7 +62,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "quorra=quorra:main",
+            "courra-sec=courra-sec:main",
         ],
     },
     author="Security Team",

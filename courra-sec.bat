@@ -1,12 +1,12 @@
 @echo off
-:: Quorra SIEM — Windows launcher
+:: Courra-Sec — Windows launcher
 :: Double-click this file or run it from the command prompt.
 ::
 :: Usage:
-::   quorra.bat                  Start with auto-selected port
-::   quorra.bat --no-browser     Start without opening a browser
-::   quorra.bat --port 8080      Start on a specific port
-::   quorra.bat --help           Show all options
+::   courra-sec.bat                  Start with auto-selected port
+::   courra-sec.bat --no-browser     Start without opening a browser
+::   courra-sec.bat --port 8080      Start on a specific port
+::   courra-sec.bat --help           Show all options
 
 cd /d "%~dp0"
 
@@ -24,11 +24,11 @@ if exist ".env" (
     )
 )
 
-echo Starting Quorra SIEM...
-"%PYTHON%" quorra.py %*
+echo Starting Courra-Sec...
+"%PYTHON%" courra-sec.py %*
 
 if %ERRORLEVEL% neq 0 (
     echo.
-    echo Quorra exited with error code %ERRORLEVEL%.
+    echo Courra-Sec exited with error code %ERRORLEVEL%.
     pause
 )

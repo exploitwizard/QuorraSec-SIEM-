@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courra-Sec — Enterprise Security for Every Team</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0e0e1a;
+            --navy2: #13131f;
+            --navy3: #1a1a2e;
+            --cyan: #22d3ee;
+            --magenta: #e879f9;
+            --purple: #a78bfa;
+            --border: rgba(255,255,255,0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--navy);
+            color: #e5e7eb;
+            font-family: 'DM Sans', 'Segoe UI', sans-serif;
+            line-height: 1.6;
+        }
+
+        /* ── Topnav ─────────────────────────────────────────────────────── */
+        .topnav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(14,14,26,0.92);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+        .brand i { color: var(--cyan); }
+        .brand .badge-v { background: rgba(167,139,250,.15); color: var(--purple); font-size: .6rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+        .nav-links { display: flex; gap: 8px; align-items: center; }
+        .nav-links a { color: rgba(255,255,255,.65); text-decoration: none; font-size: .85rem; padding: 6px 12px; border-radius: 6px; transition: .2s; }
+        .nav-links a:hover { color: #fff; background: rgba(255,255,255,.07); }
+        .btn-nav-cta { background: linear-gradient(135deg, var(--cyan), var(--magenta)); color: #0e0e1a !important; font-weight: 700 !important; padding: 8px 18px !important; border-radius: 8px !important; }
+        .btn-nav-cta:hover { opacity: .9; }
+
+        /* ── Hero ───────────────────────────────────────────────────────── */
+        .hero {
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            text-align: center;
+            padding: 120px 24px 80px;
+            background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,.06) 0%, transparent 70%),
+                        radial-gradient(ellipse at 80% 80%, rgba(232,121,249,.04) 0%, transparent 60%);
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.25);
+            color: var(--cyan); font-size: .75rem; font-weight: 600;
+            padding: 5px 14px; border-radius: 99px; margin-bottom: 28px;
+            letter-spacing: .05em;
+        }
+        .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        h1.hero-title {
+            font-size: clamp(2.4rem, 6vw, 4.2rem);
+            font-weight: 800; line-height: 1.1;
+            background: linear-gradient(135deg, #ffffff 30%, var(--cyan) 65%, var(--magenta) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px; letter-spacing: -.02em;
+        }
+        .hero-sub {
+            font-size: 1.1rem; color: rgba(255,255,255,.6); max-width: 540px; margin: 0 auto 40px;
+        }
+        .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary-cta {
+            background: linear-gradient(135deg, var(--cyan), var(--magenta));
+            color: #0e0e1a; font-weight: 700; font-size: 1rem;
+            padding: 14px 32px; border-radius: 10px; text-decoration: none;
+            transition: .2s; border: none; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary-cta:hover { opacity: .9; transform: translateY(-1px); color: #0e0e1a; }
+        .btn-secondary-cta {
+            background: rgba(255,255,255,.06); color: #e5e7eb; font-weight: 600; font-size: 1rem;
+            padding: 14px 32px; border-radius: 10px; text-decoration: none;
+            border: 1px solid var(--border); transition: .2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-secondary-cta:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+        .hero-stats { display: flex; gap: 40px; justify-content: center; margin-top: 60px; flex-wrap: wrap; }
+        .hero-stat-num { font-size: 1.8rem; font-weight: 800; color: var(--cyan); }
+        .hero-stat-lbl { font-size: .75rem; color: rgba(255,255,255,.4); margin-top: 2px; }
+
+        /* ── Sections ───────────────────────────────────────────────────── */
+        section { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+        .section-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--cyan); font-weight: 700; margin-bottom: 12px; }
+        .section-title { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800; color: #fff; margin-bottom: 12px; line-height: 1.15; }
+        .section-sub { color: rgba(255,255,255,.5); max-width: 520px; margin-bottom: 48px; }
+
+        /* ── Feature cards ──────────────────────────────────────────────── */
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .f-card {
+            background: rgba(255,255,255,.03); border: 1px solid var(--border);
+            border-radius: 14px; padding: 28px;
+            transition: .25s; position: relative; overflow: hidden;
+        }
+        .f-card::before {
+            content:''; position:absolute; inset:0; opacity:0; transition:.25s;
+            background: linear-gradient(135deg, rgba(34,211,238,.04), rgba(232,121,249,.04));
+        }
+        .f-card:hover { border-color: rgba(167,139,250,.35); transform: translateY(-2px); }
+        .f-card:hover::before { opacity: 1; }
+        .f-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            background: linear-gradient(135deg, rgba(34,211,238,.15), rgba(167,139,250,.15));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; margin-bottom: 16px;
+        }
+        .f-icon.mg { background: linear-gradient(135deg, rgba(232,121,249,.15), rgba(167,139,250,.15)); }
+        .f-icon.gn { background: linear-gradient(135deg, rgba(34,197,94,.15), rgba(34,211,238,.15)); }
+        .f-title { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .f-desc { font-size: .875rem; color: rgba(255,255,255,.5); line-height: 1.6; }
+
+        /* ── Pricing ────────────────────────────────────────────────────── */
+        .pricing-wrap { display: flex; justify-content: center; }
+        .price-card {
+            background: rgba(255,255,255,.04); border: 1px solid rgba(34,211,238,.3);
+            border-radius: 18px; padding: 40px; max-width: 420px; width: 100%;
+            position: relative; overflow: hidden;
+        }
+        .price-card::before {
+            content:''; position:absolute; top:-60px; right:-60px;
+            width:200px; height:200px; border-radius:50%;
+            background: radial-gradient(circle, rgba(34,211,238,.08) 0%, transparent 70%);
+        }
+        .price-badge {
+            display: inline-block; background: linear-gradient(135deg, var(--cyan), var(--magenta));
+            color: #0e0e1a; font-size: .7rem; font-weight: 800; padding: 3px 10px;
+            border-radius: 99px; margin-bottom: 16px; letter-spacing: .05em;
+        }
+        .price-name { font-size: 1.4rem; font-weight: 800; color: #fff; }
+        .price-amount { font-size: 3.5rem; font-weight: 900; color: var(--cyan); line-height: 1; margin: 16px 0 4px; }
+        .price-period { color: rgba(255,255,255,.4); font-size: .85rem; margin-bottom: 28px; }
+        .price-feature { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: .875rem; color: rgba(255,255,255,.75); }
+        .price-feature i { color: var(--cyan); font-size: .8rem; width: 16px; }
+        .price-cta { display: block; text-align: center; background: linear-gradient(135deg, var(--cyan), var(--magenta)); color: #0e0e1a; font-weight: 700; padding: 14px; border-radius: 10px; text-decoration: none; margin-top: 28px; transition: .2s; }
+        .price-cta:hover { opacity: .9; color: #0e0e1a; }
+        .price-note { text-align: center; color: rgba(255,255,255,.35); font-size: .75rem; margin-top: 12px; }
+
+        /* ── How it works ────────────────────────────────────────────────── */
+        .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-top: 48px; }
+        .step {
+            background: rgba(255,255,255,.03); border: 1px solid var(--border);
+            border-radius: 14px; padding: 28px; text-align: center;
+        }
+        .step-num {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: linear-gradient(135deg, rgba(34,211,238,.2), rgba(232,121,249,.2));
+            border: 2px solid rgba(34,211,238,.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 800; color: var(--cyan);
+            margin: 0 auto 16px;
+        }
+        .step h4 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .step p { font-size: .85rem; color: rgba(255,255,255,.5); }
+        .step-time { font-size: .7rem; color: var(--cyan); font-weight: 700; margin-top: 8px; opacity: .8; }
+
+        /* ── Footer ─────────────────────────────────────────────────────── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 32px 24px; text-align: center;
+            color: rgba(255,255,255,.3); font-size: .8rem;
+        }
+        footer a { color: rgba(255,255,255,.4); text-decoration: none; }
+        footer a:hover { color: var(--cyan); }
+
+        /* ── Divider ─────────────────────────────────────────────────────── */
+        .section-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+    </style>
+</head>
+<body>
+
+<!-- Topnav -->
+<nav class="topnav">
+    <a class="brand" href="/">
+        <i class="fas fa-shield-alt"></i>
+        COURRA-SEC SIEM
+        <span class="badge-v">v2.0</span>
+    </a>
+    <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="/login">Log in</a>
+        <a href="/register" class="btn-nav-cta">Start Free</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+    <div class="hero-badge">
+        <span class="dot"></span>
+        Now with ML-powered threat detection
+    </div>
+
+    <h1 class="hero-title">Enterprise-grade SIEM<br>for every team</h1>
+
+    <p class="hero-sub">
+        Real-time threat detection, ML-powered anomaly detection, and instant alerts —
+        all in one platform. Free forever.
+    </p>
+
+    <div class="hero-actions">
+        <a href="/register" class="btn-primary-cta">
+            <i class="fas fa-rocket"></i> Start Free
+        </a>
+        <a href="/demo" class="btn-secondary-cta">
+            <i class="fas fa-play-circle"></i> View Demo
+        </a>
+    </div>
+
+    <div class="hero-stats">
+        <div>
+            <div class="hero-stat-num">10K</div>
+            <div class="hero-stat-lbl">Logs / day free</div>
+        </div>
+        <div>
+            <div class="hero-stat-num">5</div>
+            <div class="hero-stat-lbl">Team members free</div>
+        </div>
+        <div>
+            <div class="hero-stat-num">&lt;5s</div>
+            <div class="hero-stat-lbl">Time to first alert</div>
+        </div>
+        <div>
+            <div class="hero-stat-num">100%</div>
+            <div class="hero-stat-lbl">Always free tier</div>
+        </div>
+    </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- Features -->
+<section id="features">
+    <div class="section-label">Platform</div>
+    <h2 class="section-title">Everything you need to detect threats</h2>
+    <p class="section-sub">From log ingestion to ML analysis to alerts — Courra-Sec gives you a complete security operations centre in minutes.</p>
+
+    <div class="feature-grid">
+        <div class="f-card">
+            <div class="f-icon"><i class="fas fa-bolt" style="color:var(--cyan)"></i></div>
+            <div class="f-title">Real-time log ingestion via SDK</div>
+            <div class="f-desc">Drop one line of JavaScript into your app. Events stream to your SIEM over WebSocket in under 100ms with automatic fallback to HTTP.</div>
+        </div>
+        <div class="f-card">
+            <div class="f-icon mg"><i class="fas fa-brain" style="color:var(--magenta)"></i></div>
+            <div class="f-title">ML-powered threat detection</div>
+            <div class="f-desc">IsolationForest anomaly detection, UEBA behavioural profiling, LSTM sequence analysis, and attack chain correlation — all running locally.</div>
+        </div>
+        <div class="f-card">
+            <div class="f-icon"><i class="fas fa-sliders-h" style="color:var(--purple)"></i></div>
+            <div class="f-title">Custom detection rules</div>
+            <div class="f-desc">Three-tier rule authoring: visual drag-and-drop, YAML/JSON rules, or a full Python DSL for advanced detections mapped to MITRE ATT&CK.</div>
+        </div>
+        <div class="f-card">
+            <div class="f-icon mg"><i class="fas fa-bell" style="color:var(--magenta)"></i></div>
+            <div class="f-title">Multi-channel alerting</div>
+            <div class="f-desc">Instant alerts to Slack, Microsoft Teams, email, and custom webhooks. Configure per-severity routing and throttling to avoid alert fatigue.</div>
+        </div>
+        <div class="f-card">
+            <div class="f-icon gn"><i class="fas fa-globe" style="color:#22c55e"></i></div>
+            <div class="f-title">GeoIP threat mapping</div>
+            <div class="f-desc">Enrich every event with country, city, and coordinates. Geo-velocity detection flags impossible travel between logins automatically.</div>
+        </div>
+        <div class="f-card">
+            <div class="f-icon"><i class="fas fa-users" style="color:var(--purple)"></i></div>
+            <div class="f-title">Team collaboration</div>
+            <div class="f-desc">Invite your security team with role-based access control. Owners, admins, analysts, and read-only roles keep sensitive actions controlled.</div>
+        </div>
+    </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Pricing -->
+<section id="pricing">
+    <div style="text-align:center">
+        <div class="section-label">Pricing</div>
+        <h2 class="section-title">Free forever. No credit card.</h2>
+        <p class="section-sub" style="margin:0 auto 48px">We run on Oracle Cloud Always Free infrastructure. Your SIEM costs us nothing — so it costs you nothing.</p>
+    </div>
+
+    <div class="pricing-wrap">
+        <div class="price-card">
+            <div class="price-badge">FREE FOREVER</div>
+            <div class="price-name">Courra-Sec Free</div>
+            <div class="price-amount">$0</div>
+            <div class="price-period">per month, forever</div>
+
+            <div class="price-feature"><i class="fas fa-check-circle"></i> Up to 5 users per organisation</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> 10,000 logs per day</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> All ML features (IsolationForest, UEBA, LSTM)</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> WebSocket real-time ingestion</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> API key included</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> Custom detection rules (10 rules)</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> Multi-channel alerts (Slack, Teams, webhook)</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> GeoIP enrichment</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> IP blocklist management</div>
+            <div class="price-feature"><i class="fas fa-check-circle"></i> JSON / CEF / Syslog export</div>
+
+            <a href="/register" class="price-cta">
+                <i class="fas fa-rocket me-2"></i>Start Free — No Card Required
+            </a>
+            <p class="price-note">Set up in under 3 minutes. No installation required.</p>
+        </div>
+    </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- How it works -->
+<section id="how-it-works">
+    <div style="text-align:center">
+        <div class="section-label">Get started</div>
+        <h2 class="section-title">Up and running in 3 steps</h2>
+        <p class="section-sub" style="margin:0 auto">From zero to real-time threat detection in under 5 minutes.</p>
+    </div>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <h4>Register your organisation</h4>
+            <p>Create an account, name your organisation, and get instant access to your SIEM dashboard.</p>
+            <div class="step-time"><i class="fas fa-clock me-1"></i>30 seconds</div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <h4>Copy your API key and add the SDK</h4>
+            <p>Add one &lt;script&gt; tag to your website or app. The SDK automatically collects security events and streams them to your SIEM.</p>
+            <div class="step-time"><i class="fas fa-clock me-1"></i>2 minutes</div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <h4>See threats in real time</h4>
+            <p>Within seconds of deploying the SDK, events appear in your dashboard. ML detection and alerts run automatically.</p>
+            <div class="step-time"><i class="fas fa-clock me-1"></i>Immediately</div>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer>
+    <p style="margin-bottom:8px">
+        <a href="/"><i class="fas fa-shield-alt me-1" style="color:var(--cyan)"></i>Courra-Sec</a>
+        &nbsp;·&nbsp;
+        <a href="/login">Log in</a>
+        &nbsp;·&nbsp;
+        <a href="/register">Register</a>
+    </p>
+    <p>Built with Python, Flask, and scikit-learn &nbsp;·&nbsp; Deployed free on Oracle Cloud ARM</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

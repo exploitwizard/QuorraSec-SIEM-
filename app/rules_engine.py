@@ -18,7 +18,7 @@ class RulesEngine:
         self.user_login_cache  = {}
 
         try:
-            self.geoip_reader = geoip2.database.Reader("data/geolite/GeoLite2-City.mmdb")
+            self.geoip_reader = geoip2.database.Reader(Config.GEOIP_DB_PATH)
         except Exception:
             self.geoip_reader = None
             if not RulesEngine._geoip_warning_printed:
@@ -38,8 +38,12 @@ class RulesEngine:
             "block_ip":  False,
         }
 
-        # Already blocked?
-        is_blocked = IPBlocklist.query.filter_by(ip_address=log_entry.ip_address).first()
+        # Already blocked? (scope to org if available)
+        org_id = getattr(log_entry, 'organisation_id', None)
+        bl_query = {'ip_address': log_entry.ip_address}
+        if org_id is not None:
+            bl_query['organisation_id'] = org_id
+        is_blocked = IPBlocklist.query.filter_by(**bl_query).first()
         if is_blocked:
             return {
                 "triggered": True,
@@ -275,14 +279,17 @@ class RulesEngine:
         return {"triggered": False}
 
     def check_multiple_attack_types(self, log_entry):
-        ip = log_entry.ip_address
+        ip     = log_entry.ip_address
+        org_id = getattr(log_entry, 'organisation_id', None)
         threshold = datetime.utcnow() - timedelta(minutes=5)
 
-        # ← FIXED: Attack was not imported — now it is
-        recent = Attack.query.filter(
+        q = Attack.query.filter(
             Attack.ip_address == ip,
             Attack.detected_at >= threshold,
-        ).all()
+        )
+        if org_id is not None:
+            q = q.filter(Attack.organisation_id == org_id)
+        recent = q.all()
 
         attack_types = {a.attack_type for a in recent}
         attack_types.add(log_entry.attack_type)
@@ -321,7 +328,11 @@ class RulesEngine:
             # Add to temporal history for count_within etc.
             evaluator.add_to_history(event_dict)
 
-            rules = CustomRule.query.filter_by(enabled=True).all()
+            org_id = getattr(log_entry, 'organisation_id', None)
+            if org_id is not None:
+                rules = CustomRule.query.filter_by(enabled=True, organisation_id=org_id).all()
+            else:
+                rules = CustomRule.query.filter_by(enabled=True).all()
             for rule in rules:
                 triggered = False
                 error     = None

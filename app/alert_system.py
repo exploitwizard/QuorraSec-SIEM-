@@ -21,7 +21,29 @@ class AlertSystem:
     # Core creation
     # ------------------------------------------------------------------
 
-    def create_alert(self, message: str, alert_type: str, severity: str, details=None) -> Alert | None:
+    def send_alert(self, message: str, severity: str, details=None) -> None:
+        """Fire external notification channels only (no DB write)."""
+        if severity not in ("high", "critical"):
+            return
+
+        class _FakeAlert:
+            pass
+
+        a = _FakeAlert()
+        a.message    = message
+        a.severity   = severity
+        a.alert_type = "rule"
+        a.created_at = datetime.utcnow()
+        a.details    = json.dumps(details) if details else None
+
+        threading.Thread(
+            target=self._send_all_notifications,
+            args=(a,),
+            daemon=True,
+        ).start()
+
+    def create_alert(self, message: str, alert_type: str, severity: str,
+                     details=None, organisation_id: int = None) -> Alert | None:
         """Persist an alert and fire notifications asynchronously."""
         try:
             alert = Alert(
@@ -29,6 +51,7 @@ class AlertSystem:
                 alert_type=alert_type,
                 severity=severity,
                 details=json.dumps(details) if details else None,
+                organisation_id=organisation_id,
             )
             db.session.add(alert)
             db.session.commit()
@@ -124,7 +147,7 @@ class AlertSystem:
 
             payload = {
                 "text": (
-                    f"{severity_emoji} *Quorra SIEM Alert* "
+                    f"{severity_emoji} *Courra-Sec Alert* "
                     f"[{alert.severity.upper()}]\n"
                     f"*Type:* {alert.alert_type}\n"
                     f"*Message:* {alert.message}\n"
@@ -144,7 +167,7 @@ class AlertSystem:
         try:
             import requests as _req
             payload = {
-                "source":      "QuorraSIEM",
+                "source":      "CourraSec",
                 "alert_type":  alert.alert_type,
                 "severity":    alert.severity,
                 "message":     alert.message,
@@ -175,7 +198,7 @@ class AlertSystem:
                 "@context":   "http://schema.org/extensions",
                 "themeColor": {"critical": "FF0000", "high": "FF6600", "medium": "FFCC00",
                                "low": "00CC00", "info": "0078D4"}.get(alert.severity, "0078D4"),
-                "summary":    f"Quorra SIEM Alert: {alert.alert_type}",
+                "summary":    f"Courra-Sec Alert: {alert.alert_type}",
                 "sections":   [{
                     "activityTitle":    f"**{alert.alert_type}** [{alert.severity.upper()}]",
                     "activitySubtitle": alert.message,
@@ -204,23 +227,23 @@ class AlertSystem:
             smtp_port = int(os.environ.get("SMTP_PORT", "587"))
             smtp_user = os.environ.get("SMTP_USER", "")
             smtp_pass = os.environ.get("SMTP_PASS", "")
-            mail_from = os.environ.get("ALERT_FROM", "quorra@localhost")
+            mail_from = os.environ.get("ALERT_FROM", "courra-sec@localhost")
             mail_to   = os.environ.get("ALERT_TO",   "admin@localhost")
 
             msg = MIMEMultipart()
             msg["From"]    = mail_from
             msg["To"]      = mail_to
-            msg["Subject"] = f"[Quorra] {alert.alert_type} — {alert.severity.upper()}"
+            msg["Subject"] = f"[Courra-Sec] {alert.alert_type} — {alert.severity.upper()}"
 
             body = f"""
-            <h2>Security Alert from Quorra SIEM</h2>
+            <h2>Security Alert from Courra-Sec</h2>
             <p><strong>Type:</strong> {alert.alert_type}</p>
             <p><strong>Severity:</strong> {alert.severity}</p>
             <p><strong>Message:</strong> {alert.message}</p>
             <p><strong>Time:</strong> {alert.created_at}</p>
             <h3>Details:</h3>
             <pre>{json.dumps(json.loads(alert.details), indent=2) if alert.details else 'No details'}</pre>
-            <hr><p><em>Automated alert from Quorra SIEM.</em></p>
+            <hr><p><em>Automated alert from Courra-Sec.</em></p>
             """
             msg.attach(MIMEText(body, "html"))
 

@@ -1,6 +1,6 @@
-# Quorra SIEM Tool
+# Courra-Sec Tool
 
-Quorra is a Security Information and Event Management (SIEM) tool designed specifically for monitoring the Block Fortress application. It provides real-time security monitoring, attack detection, and alerting.
+Courra-Sec is a Security Information and Event Management (SIEM) tool designed specifically for monitoring the Block Fortress application. It provides real-time security monitoring, attack detection, and alerting.
 
 ## Features
 
@@ -15,15 +15,15 @@ Quorra is a Security Information and Event Management (SIEM) tool designed speci
 
 ### Method 1: Quick Install
 ```bash
-# 1. Clone or extract Quorra
-git clone <quorra-repo>
-cd quorra
+# 1. Clone or extract Courra-Sec
+git clone <courra-sec-repo>
+cd courra-sec
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Make executable
-chmod +x quorra.py
+chmod +x courra-sec.py
 
 # 4. Install globally
 pip install -e .

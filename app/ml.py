@@ -1,5 +1,5 @@
 """
-app/ml.py — Quorra ML Pipeline
+app/ml.py — Courra-Sec ML Pipeline
 Provides: anomaly detection (IsolationForest / statistical fallback),
 UEBA, risk scoring, entity graph, attack-chain detection, MITRE mapping.
 """

@@ -1,10 +1,10 @@
 /**
- * Quorra Security SDK  v2.0.0
+ * Courra-Sec Security SDK  v2.0.0
  * ─────────────────────────────────────────────────────────────────────────────
  * Drop-in browser security telemetry — works like Sentry / Datadog RUM.
  *
  * ONE-LINE INSTALL:
- *   <script src="https://your-siem.com/quorra-sdk.js"
+ *   <script src="https://your-siem.com/courra-sec-sdk.js"
  *           data-api-key="YOUR_KEY"></script>
  *
  * Optional attributes:
@@ -14,10 +14,10 @@
  *   data-sample-rate="0.5"                   send 50 % of events
  *
  * Manual API (all optional — SDK works fully automatically):
- *   QuorraSDK.setUser({ id, username, role })
- *   QuorraSDK.captureEvent({ attackType, severity, payload, endpoint })
- *   QuorraSDK.captureError(error, context)
- *   QuorraSDK.flush()
+ *   Courra-SecSDK.setUser({ id, username, role })
+ *   Courra-SecSDK.captureEvent({ attackType, severity, payload, endpoint })
+ *   Courra-SecSDK.captureError(error, context)
+ *   Courra-SecSDK.flush()
  *
  * AUTO-COLLECTED EVENTS:
  *   JavaScript errors & unhandled promise rejections
@@ -55,7 +55,7 @@
   var _origin = (function () {
     var attr = _el && _el.getAttribute('data-endpoint');
     if (attr) return attr.replace(/\/$/, '');
-    if (_el && _el.src) return _el.src.replace(/\/quorra-sdk\.js.*$/, '');
+    if (_el && _el.src) return _el.src.replace(/\/courra-sec-sdk\.js.*$/, '');
     return location.protocol + '//' + location.hostname + ':5001';
   }());
 
@@ -75,7 +75,7 @@
   function _log() {
     if (!_dbg) return;
     var a = Array.prototype.slice.call(arguments);
-    a.unshift('[QuorraSDK]');
+    a.unshift('[Courra-SecSDK]');
     console.log.apply(console, a);
   }
 
@@ -150,21 +150,25 @@
   /* ── event envelope ─────────────────────────────────────────────────────── */
   function _evt(f) {
     return {
-      timestamp:  _now(),
-      appName:    _appName,
-      sdkVersion: VERSION,
-      sessionId:  _sid,
-      userId:     _user ? (_user.id || _user.username || null) : null,
-      userRole:   _user ? (_user.role || null) : null,
-      pageUrl:    location.href,
-      userAgent:  navigator.userAgent,
-      ipAddress:  'client',
-      endpoint:   f.endpoint || (location.pathname + location.search),
-      attackType: f.attackType || 'unknown',
-      severity:   f.severity  || 'info',
-      payload:    _trunc(f.payload || '', 1000),
-      statusCode: f.statusCode || 0,
-      tags:       f.tags || [],
+      timestamp:   _now(),
+      appName:     _appName,
+      sdkVersion:  VERSION,
+      sessionId:   _sid,
+      userId:      _user ? (_user.id || _user.username || null) : null,
+      userRole:    _user ? (_user.role || null) : null,
+      pageUrl:     location.href,
+      userAgent:   navigator.userAgent,
+      screenWidth:  root.screen ? root.screen.width  : null,
+      screenHeight: root.screen ? root.screen.height : null,
+      language:    navigator.language || null,
+      referrer:    document.referrer || null,
+      ipAddress:   'client',
+      endpoint:    f.endpoint || (location.pathname + location.search),
+      attackType:  f.attackType || 'unknown',
+      severity:    f.severity  || 'info',
+      payload:     _trunc(f.payload || '', 1000),
+      statusCode:  f.statusCode || 0,
+      tags:        f.tags || [],
     };
   }
 
@@ -179,18 +183,25 @@
   }
 
   function _send(body) {
+    /* If SDK not configured, discard silently */
+    if (!_httpURL || !_apiKey) return;
     /* WebSocket — persistent, zero-overhead */
     if (_ws && _wsOk && _ws.readyState === 1 /* OPEN */) {
       try { _ws.send(body); return; } catch (e) { _wsOk = false; }
     }
     /* HTTP fallback */
-    var h = { 'Content-Type': 'application/json' };
-    if (_apiKey) h['X-Quorra-Key'] = _apiKey;
+    var h = {
+      'Content-Type':               'application/json',
+      'X-API-Key':                  _apiKey,
+      'ngrok-skip-browser-warning': 'true',
+    };
     try {
       fetch(_httpURL, { method: 'POST', headers: h, body: body, keepalive: true })
         .catch(function (e) { _log('HTTP send failed:', e.message); });
     } catch (e) {
-      if (navigator.sendBeacon) navigator.sendBeacon(_httpURL, body);
+      try {
+        if (navigator.sendBeacon) navigator.sendBeacon(_httpURL, new Blob([body], {type:'application/json'}));
+      } catch (e2) { /* silent */ }
     }
   }
 
@@ -362,7 +373,7 @@
         m.addedNodes.forEach(function (node) {
           if (node.nodeName !== 'SCRIPT') return;
           var src = node.src || '';
-          if (src.indexOf('quorra-sdk') !== -1) return;   // ignore self
+          if (src.indexOf('courra-sec-sdk') !== -1) return;   // ignore self
           var t = src ? _scan(src) : _scan(node.textContent || '');
           if (t) _push({ attackType: 'Script Injection Detected', severity: 'critical',
             payload: _trunc(src || node.textContent || '', 300),
@@ -423,20 +434,34 @@
     version: VERSION,
 
     /**
-     * Initialise manually (not needed when using data-api-key).
-     * @param {{ apiKey?, appName?, endpoint?, debug?, sampleRate? }} cfg
+     * Initialise the SDK.
+     * Supports both forms:
+     *   Courra-SecSDK.init({ url: '...', apiKey: 'qrr_live_...' })   ← SaaS form
+     *   Courra-SecSDK.init({ endpoint: '...', apiKey: '...' })        ← legacy form
+     * @param {{ url?, endpoint?, apiKey?, appName?, debug?, sampleRate?, flushInterval?, maxQueueSize? }} cfg
      */
     init: function (cfg) {
       cfg = cfg || {};
       if (cfg.apiKey)     _apiKey  = cfg.apiKey;
       if (cfg.appName)    _appName = cfg.appName;
-      if (cfg.debug)      _dbg     = cfg.debug;
-      if (cfg.sampleRate != null) _rate = cfg.sampleRate;
-      if (cfg.endpoint) {
-        var o = cfg.endpoint.replace(/\/$/, '');
+      if (cfg.debug  != null)      _dbg  = !!cfg.debug;
+      if (cfg.sampleRate != null)  _rate = +cfg.sampleRate;
+
+      /* Support both url (new) and endpoint (legacy) */
+      var baseUrl = cfg.url || cfg.endpoint || null;
+      if (baseUrl) {
+        var o = baseUrl.replace(/\/$/, '');
         _origin  = o;
         _httpURL = o + '/ingest';
         _wsURL   = o.replace(/^http/, 'ws') + '/ws/ingest';
+      }
+
+      /* Warn and disable if no url configured */
+      if (!_httpURL || !_apiKey) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[Courra-SecSDK] Not initialised — provide url and apiKey to Courra-SecSDK.init()');
+        }
+        return this;
       }
 
       _wsConnect();
@@ -497,7 +522,7 @@
     _autoInit();
   }
 
-  root.QuorraSDK = SDK;
+  root['Courra-SecSDK'] = SDK;
 
 }(typeof globalThis !== 'undefined' ? globalThis
   : typeof window   !== 'undefined' ? window : this));

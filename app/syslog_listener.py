@@ -1,6 +1,6 @@
 # app/syslog_listener.py
 """
-Cross-platform syslog receiver for Quorra SIEM.
+Cross-platform syslog receiver for Courra-Sec.
 
 Listens on UDP (and optionally TCP) for RFC 3164 / RFC 5424 syslog messages
 and converts them to LogEntry records in the database.

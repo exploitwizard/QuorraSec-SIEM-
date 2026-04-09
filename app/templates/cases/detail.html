@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Courra-Sec — Case #{{ case.id }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+.navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+.nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}.nav-link:hover{color:#a78bfa!important;}
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:16px;}
+.sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:6px;font-weight:600;}
+.form-control,.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+.form-select option{background:#1f2937;}
+.prio{padding:2px 10px;border-radius:99px;font-size:.7rem;font-weight:700;text-transform:uppercase;}
+.prio-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+.prio-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+.prio-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+.prio-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+.status-badge{padding:3px 10px;border-radius:99px;font-size:.7rem;font-weight:600;}
+.st-open{background:rgba(59,130,246,.2);color:#93c5fd;border:1px solid rgba(59,130,246,.35);}
+.st-in_progress{background:rgba(168,85,247,.2);color:#d8b4fe;border:1px solid rgba(168,85,247,.35);}
+.st-resolved{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.35);}
+.st-closed{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.35);}
+.timeline-item{border-left:2px solid rgba(99,102,241,.3);padding-left:16px;margin-bottom:14px;position:relative;}
+.timeline-item::before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;background:#6366f1;}
+.item-note{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.15);border-radius:8px;padding:8px 12px;font-size:.8rem;}
+.item-alert{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:8px;padding:8px 12px;font-size:.8rem;}
+.item-log{background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);border-radius:8px;padding:8px 12px;font-size:.8rem;}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM</a>
+    <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+        <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+        <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+        <a class="nav-link px-2" href="/cases"><i class="fas fa-folder-open me-1"></i>Cases</a>
+        <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+    </div>
+</div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+<div class="mb-3"><a href="/cases" class="text-secondary text-decoration-none" style="font-size:.82rem"><i class="fas fa-arrow-left me-1"></i>Back to Cases</a></div>
+
+<div class="row g-3">
+<!-- Left: case details -->
+<div class="col-lg-8">
+    <div class="g-card">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <span class="prio prio-{{ case.priority }}">{{ case.priority }}</span>
+                <span class="status-badge st-{{ case.status }} ms-2">{{ case.status.replace('_',' ') }}</span>
+                <span class="badge ms-2" style="background:rgba(255,255,255,.06);color:#9ca3af;font-size:.62rem">#{{ case.id }}</span>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" id="statusSelect" onchange="updateStatus()" style="width:140px">
+                    <option value="open" {% if case.status=='open' %}selected{% endif %}>Open</option>
+                    <option value="in_progress" {% if case.status=='in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="resolved" {% if case.status=='resolved' %}selected{% endif %}>Resolved</option>
+                    <option value="closed" {% if case.status=='closed' %}selected{% endif %}>Closed</option>
+                </select>
+            </div>
+        </div>
+
+        <h2 class="h5 mb-2" id="caseTitle">{{ case.title }}</h2>
+        <p class="text-secondary mb-3" style="font-size:.85rem">{{ case.description or 'No description.' }}</p>
+
+        {% if case.mitre_tactic %}
+        <span class="badge" style="background:rgba(99,102,241,.2);color:#c7d2fe;font-size:.7rem"><i class="fas fa-crosshairs me-1"></i>{{ case.mitre_tactic }}</span>
+        {% endif %}
+
+        <hr style="border-color:rgba(255,255,255,.08);margin:16px 0">
+
+        <!-- Timeline -->
+        <div class="sec-head">Timeline</div>
+        <div id="timeline">
+            {% for item in case.items %}
+            <div class="timeline-item">
+                <div class="item-{{ item.item_type }}">
+                    <div class="d-flex justify-content-between">
+                        <span style="color:#a78bfa;font-size:.72rem;font-weight:600"><i class="fas fa-{% if item.item_type=='note' %}sticky-note{% elif item.item_type=='alert' %}bell{% else %}list{% endif %} me-1"></i>{{ item.item_type.upper() }}</span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <small class="text-secondary">{{ item.added_by }} · {{ item.added_at.strftime('%Y-%m-%d %H:%M') if item.added_at else '' }}</small>
+                            <button class="btn btn-sm p-0" style="color:#6b7280;font-size:.7rem" onclick="deleteItem({{ item.id }})"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    {% if item.note %}<div class="mt-1" style="font-size:.8rem">{{ item.note }}</div>{% endif %}
+                    {% if item.item_id and item.item_type in ('alert','log') %}<div class="mt-1" style="font-size:.72rem;color:#6b7280">Ref #{{ item.item_id }}</div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% if not case.items %}<div class="text-secondary" style="font-size:.82rem">No timeline entries yet.</div>{% endif %}
+        </div>
+
+        <!-- Add note -->
+        <div class="mt-3">
+            <div class="sec-head">Add Note</div>
+            <textarea class="form-control mb-2" id="noteText" rows="2" placeholder="Write an investigation note…"></textarea>
+            <button class="btn btn-sm btn-primary" onclick="addNote()"><i class="fas fa-plus me-1"></i>Add Note</button>
+        </div>
+
+        <!-- Link alert/log -->
+        <div class="mt-3">
+            <div class="sec-head">Link Evidence</div>
+            <div class="row g-2">
+                <div class="col-5">
+                    <select class="form-select form-select-sm" id="itemType">
+                        <option value="alert">Alert</option>
+                        <option value="log">Log</option>
+                        <option value="ioc">IOC</option>
+                    </select>
+                </div>
+                <div class="col-5"><input type="number" class="form-control form-control-sm" id="itemId" placeholder="ID"></div>
+                <div class="col-2"><button class="btn btn-sm btn-outline-primary w-100" onclick="linkItem()"><i class="fas fa-link"></i></button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Right: metadata -->
+<div class="col-lg-4">
+    <div class="g-card">
+        <div class="sec-head">Case Info</div>
+        <table class="table table-sm" style="font-size:.8rem;color:#9ca3af">
+            <tr><td>Created</td><td>{{ case.created_at.strftime('%Y-%m-%d %H:%M') if case.created_at else '—' }}</td></tr>
+            <tr><td>Updated</td><td>{{ case.updated_at.strftime('%Y-%m-%d %H:%M') if case.updated_at else '—' }}</td></tr>
+            {% if case.closed_at %}<tr><td>Closed</td><td>{{ case.closed_at.strftime('%Y-%m-%d') }}</td></tr>{% endif %}
+            <tr><td>Priority</td><td><span class="prio prio-{{ case.priority }}">{{ case.priority }}</span></td></tr>
+            <tr><td>Status</td><td><span class="status-badge st-{{ case.status }}">{{ case.status }}</span></td></tr>
+            <tr><td>Items</td><td>{{ case.items|length }}</td></tr>
+        </table>
+
+        <hr style="border-color:rgba(255,255,255,.08)">
+        <div class="sec-head">Assign To</div>
+        <select class="form-select form-select-sm mb-3" id="assignSelect" onchange="assignCase()">
+            <option value="">Unassigned</option>
+            {% for u in users %}
+            <option value="{{ u.id }}" {% if case.assigned_to_id == u.id %}selected{% endif %}>{{ u.username }} ({{ u.role }})</option>
+            {% endfor %}
+        </select>
+
+        <hr style="border-color:rgba(255,255,255,.08)">
+        <div class="sec-head">Priority</div>
+        <select class="form-select form-select-sm mb-3" id="prioSelect" onchange="updatePrio()">
+            <option value="critical" {% if case.priority=='critical' %}selected{% endif %}>Critical</option>
+            <option value="high"     {% if case.priority=='high'     %}selected{% endif %}>High</option>
+            <option value="medium"   {% if case.priority=='medium'   %}selected{% endif %}>Medium</option>
+            <option value="low"      {% if case.priority=='low'      %}selected{% endif %}>Low</option>
+        </select>
+
+        <hr style="border-color:rgba(255,255,255,.08)">
+        <button class="btn btn-sm btn-outline-danger w-100" onclick="deleteCase()"><i class="fas fa-trash me-1"></i>Delete Case</button>
+    </div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const CASE_ID = {{ case.id }};
+
+function updateStatus() {
+    patch({status: document.getElementById('statusSelect').value});
+}
+function assignCase() {
+    const v = document.getElementById('assignSelect').value;
+    patch({assigned_to_id: v ? parseInt(v) : null});
+}
+function updatePrio() {
+    patch({priority: document.getElementById('prioSelect').value});
+}
+
+function patch(data) {
+    fetch(`/api/cases/${CASE_ID}`, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(data)
+    }).then(r=>r.json()).then(d=>{ if(!d.ok) alert(d.error); });
+}
+
+function addNote() {
+    const note = document.getElementById('noteText').value.trim();
+    if(!note) return;
+    fetch(`/api/cases/${CASE_ID}/items`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({item_type:'note', note})
+    }).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert(d.error); });
+}
+
+function linkItem() {
+    const item_type = document.getElementById('itemType').value;
+    const item_id   = parseInt(document.getElementById('itemId').value);
+    if(!item_id) return;
+    fetch(`/api/cases/${CASE_ID}/items`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({item_type, item_id})
+    }).then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); else alert(d.error); });
+}
+
+function deleteItem(itemId) {
+    if(!confirm('Remove this item?')) return;
+    fetch(`/api/cases/${CASE_ID}/items/${itemId}`, {method:'DELETE'})
+        .then(r=>r.json()).then(d=>{ if(d.ok) location.reload(); });
+}
+
+function deleteCase() {
+    if(!confirm('Delete this case permanently?')) return;
+    fetch(`/api/cases/${CASE_ID}`, {method:'DELETE'})
+        .then(r=>r.json()).then(d=>{ if(d.ok) window.location='/cases'; else alert(d.error); });
+}
+</script>
+</body>
+</html>

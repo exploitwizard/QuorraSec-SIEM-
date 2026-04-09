@@ -1,11 +1,11 @@
 #!/bin/sh
-# Quorra SIEM — Unix / macOS launcher
+# Courra-Sec — Unix / macOS launcher
 #
 # Usage:
-#   ./quorra.sh                  Start with auto-selected port
-#   ./quorra.sh --no-browser     Start without opening a browser
-#   ./quorra.sh --port 8080      Start on a specific port
-#   ./quorra.sh --help           Show all options
+#   ./courra-sec.sh                  Start with auto-selected port
+#   ./courra-sec.sh --no-browser     Start without opening a browser
+#   ./courra-sec.sh --port 8080      Start on a specific port
+#   ./courra-sec.sh --help           Show all options
 
 set -e
 cd "$(dirname "$0")"
@@ -25,5 +25,5 @@ else
     PYTHON="python"
 fi
 
-echo "Starting Quorra SIEM..."
-exec "$PYTHON" quorra.py "$@"
+echo "Starting Courra-Sec..."
+exec "$PYTHON" courra-sec.py "$@"

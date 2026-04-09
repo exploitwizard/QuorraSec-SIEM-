@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Courra-Sec — Cases</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+body{background:linear-gradient(135deg,#0d0d1a 0%,#111827 100%);color:#e5e7eb;min-height:100vh;font-family:'Segoe UI',sans-serif;}
+.navbar{background:#0a0a14!important;border-bottom:1px solid rgba(99,102,241,.25);}
+.nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+.nav-link:hover,.nav-link.active{color:#a78bfa!important;}
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:16px;}
+.sec-head{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:6px;font-weight:600;}
+.form-control,.form-select{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.12)!important;color:#e5e7eb!important;font-size:.82rem;}
+.form-select option{background:#1f2937;}
+.prio{padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:700;text-transform:uppercase;}
+.prio-critical{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);}
+.prio-high{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+.prio-medium{background:rgba(234,179,8,.2);color:#fde68a;border:1px solid rgba(234,179,8,.4);}
+.prio-low{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.4);}
+.status-badge{padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:600;}
+.st-open{background:rgba(59,130,246,.2);color:#93c5fd;border:1px solid rgba(59,130,246,.35);}
+.st-in_progress{background:rgba(168,85,247,.2);color:#d8b4fe;border:1px solid rgba(168,85,247,.35);}
+.st-resolved{background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.35);}
+.st-closed{background:rgba(107,114,128,.2);color:#9ca3af;border:1px solid rgba(107,114,128,.35);}
+.case-row{border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px 16px;margin-bottom:10px;transition:.15s;cursor:pointer;}
+.case-row:hover{background:rgba(255,255,255,.04);border-color:rgba(99,102,241,.3);}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM</a>
+    <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
+        <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
+        <a class="nav-link px-2" href="/dashboard">Dashboard</a>
+        <a class="nav-link px-2" href="/search">Search</a>
+        <a class="nav-link px-2" href="/alerts">Alerts</a>
+        <a class="nav-link active px-2" href="/cases"><i class="fas fa-folder-open me-1"></i>Cases</a>
+        <a class="nav-link px-2" href="/playbooks">Playbooks</a>
+        <a class="nav-link px-2 text-warning" href="/logout">Logout</a>
+    </div>
+</div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-0"><i class="fas fa-folder-open me-2" style="color:#06b6d4"></i>Cases</h1>
+        <p class="text-secondary mb-0" style="font-size:.8rem">Track investigations and link alerts, logs, and notes</p>
+    </div>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newCaseModal"><i class="fas fa-plus me-1"></i>New Case</button>
+</div>
+
+<!-- Filters -->
+<div class="g-card py-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="sec-head">Status</label>
+            <select class="form-select form-select-sm" id="statusFilter" onchange="loadCases()">
+                <option value="">All</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="sec-head">Priority</label>
+            <select class="form-select form-select-sm" id="prioFilter" onchange="renderCases()">
+                <option value="">All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="g-card text-center"><div class="h3 mb-0" style="color:#3b82f6" id="stOpen">—</div><div class="sec-head mt-1 mb-0">Open</div></div></div>
+    <div class="col-6 col-md-3"><div class="g-card text-center"><div class="h3 mb-0" style="color:#a78bfa" id="stInProgress">—</div><div class="sec-head mt-1 mb-0">In Progress</div></div></div>
+    <div class="col-6 col-md-3"><div class="g-card text-center"><div class="h3 mb-0" style="color:#22c55e" id="stResolved">—</div><div class="sec-head mt-1 mb-0">Resolved</div></div></div>
+    <div class="col-6 col-md-3"><div class="g-card text-center"><div class="h3 mb-0 text-secondary" id="stTotal">—</div><div class="sec-head mt-1 mb-0">Total</div></div></div>
+</div>
+
+<!-- Cases list -->
+<div id="casesList"><div class="text-center py-5 text-secondary"><div class="spinner-border spinner-border-sm"></div></div></div>
+</div>
+
+<!-- New case modal -->
+<div class="modal fade" id="newCaseModal" tabindex="-1">
+<div class="modal-dialog">
+<div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+    <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+        <h5 class="modal-title"><i class="fas fa-plus me-2" style="color:#06b6d4"></i>New Case</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+        <div class="mb-3">
+            <label class="sec-head">Title *</label>
+            <input type="text" class="form-control" id="ncTitle" placeholder="Investigation title">
+        </div>
+        <div class="mb-3">
+            <label class="sec-head">Description</label>
+            <textarea class="form-control" id="ncDesc" rows="3" placeholder="What is being investigated?"></textarea>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="sec-head">Priority</label>
+                <select class="form-select" id="ncPrio">
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="sec-head">MITRE Tactic</label>
+                <input type="text" class="form-control" id="ncMitre" placeholder="e.g. TA0001">
+            </div>
+        </div>
+        <div id="ncError" class="alert alert-danger mt-3" style="display:none"></div>
+    </div>
+    <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="createCase()">Create Case</button>
+    </div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let allCases = [];
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function loadCases() {
+    const status = document.getElementById('statusFilter').value;
+    const url = '/api/cases' + (status ? '?status='+status : '');
+    fetch(url).then(r=>r.json()).then(data => {
+        allCases = data;
+        updateStats(data);
+        renderCases();
+    });
+}
+
+function updateStats(cases) {
+    document.getElementById('stOpen').textContent       = cases.filter(c=>c.status==='open').length;
+    document.getElementById('stInProgress').textContent = cases.filter(c=>c.status==='in_progress').length;
+    document.getElementById('stResolved').textContent   = cases.filter(c=>c.status==='resolved').length;
+    document.getElementById('stTotal').textContent      = cases.length;
+}
+
+function renderCases() {
+    const prio = document.getElementById('prioFilter').value;
+    const filtered = prio ? allCases.filter(c=>c.priority===prio) : allCases;
+
+    if(!filtered.length) {
+        document.getElementById('casesList').innerHTML = '<div class="text-center py-5 text-secondary"><i class="fas fa-folder-open fa-2x mb-2 d-block opacity-25"></i>No cases found</div>';
+        return;
+    }
+
+    const html = filtered.map(c => `
+    <div class="case-row" onclick="window.location='/cases/${c.id}'">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <span class="prio prio-${c.priority}">${c.priority}</span>
+                <span class="status-badge st-${c.status} ms-2">${c.status.replace('_',' ')}</span>
+                <span class="ms-2 fw-semibold">${escHtml(c.title)}</span>
+            </div>
+            <small class="text-secondary">#${c.id} · ${c.created_at ? c.created_at.substring(0,10) : ''}</small>
+        </div>
+        ${c.description ? `<div class="mt-1 text-secondary" style="font-size:.78rem">${escHtml(c.description.substring(0,120))}${c.description.length>120?'…':''}</div>` : ''}
+        ${c.mitre_tactic ? `<span class="badge mt-1" style="background:rgba(99,102,241,.2);color:#c7d2fe;font-size:.62rem"><i class="fas fa-crosshairs me-1"></i>${escHtml(c.mitre_tactic)}</span>` : ''}
+    </div>`).join('');
+    document.getElementById('casesList').innerHTML = html;
+}
+
+function createCase() {
+    const title = document.getElementById('ncTitle').value.trim();
+    if(!title){ document.getElementById('ncError').textContent='Title is required'; document.getElementById('ncError').style.display='block'; return; }
+    fetch('/api/cases', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+            title, description: document.getElementById('ncDesc').value,
+            priority: document.getElementById('ncPrio').value,
+            mitre_tactic: document.getElementById('ncMitre').value
+        })
+    }).then(r=>r.json()).then(d=>{
+        if(d.ok){ bootstrap.Modal.getInstance(document.getElementById('newCaseModal')).hide(); loadCases(); }
+        else { document.getElementById('ncError').textContent=d.error; document.getElementById('ncError').style.display='block'; }
+    });
+}
+
+loadCases();
+</script>
+</body>
+</html>

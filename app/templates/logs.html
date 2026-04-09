@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quorra SIEM - Security Logs</title>
+    <title>Courra-Sec - Security Logs</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -59,7 +59,7 @@
 <body>
 <nav class="navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>QUORRA SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
+        <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-alt me-2" style="color:#a78bfa"></i>COURRA-SEC SIEM <span class="badge ms-1" style="background:#1e1b4b;color:#a78bfa;font-size:.62rem">v2.0</span><span class="badge bg-success ms-1 live-badge" style="font-size:.62rem">LIVE</span></a>
         <div class="navbar-nav flex-row align-items-center ms-auto gap-1">
             <span class="text-secondary me-2" style="font-size:.8rem"><i class="fas fa-user-circle me-1"></i>{{ username }}</span>
             <a class="nav-link px-2" href="/dashboard"><i class="fas fa-chart-line me-1"></i>Dashboard</a>
@@ -84,6 +84,7 @@
         </div>
         <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs(currentPage)"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+            <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="fas fa-upload me-1"></i>Upload Logs</button>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-info dropdown-toggle" data-bs-toggle="dropdown"><i class="fas fa-download me-1"></i>Export</button>
                 <ul class="dropdown-menu dropdown-menu-dark">
@@ -138,6 +139,10 @@
             <div class="col-12 col-md-4 d-flex gap-2 mt-1">
                 <button class="btn btn-sm btn-primary flex-fill" onclick="applyFilters()"><i class="fas fa-filter me-1"></i>Filter</button>
                 <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">Clear</button>
+                <div class="form-check form-switch d-flex align-items-center mb-0 ms-1" title="Show suppressed (noise-filtered) logs">
+                    <input class="form-check-input mt-0" type="checkbox" id="showSuppressedToggle" onchange="applyFilters()">
+                    <label class="form-check-label ms-2 text-secondary" style="font-size:.75rem;white-space:nowrap" for="showSuppressedToggle">Show suppressed</label>
+                </div>
             </div>
         </div>
     </div>
@@ -183,6 +188,40 @@
             <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                 <button class="btn btn-sm btn-danger" id="modalBlockBtn"><i class="fas fa-ban me-1"></i>Block IP</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Logs Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1)">
+            <div class="modal-header" style="border-color:rgba(255,255,255,.1)">
+                <h5 class="modal-title"><i class="fas fa-upload me-2" style="color:#22c55e"></i>Upload External Logs</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary" style="font-size:.85rem">Upload log files from external sources for analysis. Supports JSON arrays, CEF, and syslog formats. Max 5,000 events per upload.</p>
+                <div class="mb-3">
+                    <label class="sec-head d-block">Log Format</label>
+                    <select class="form-select form-select-sm" id="uploadFormat" style="max-width:200px">
+                        <option value="auto">Auto-detect</option>
+                        <option value="json">JSON</option>
+                        <option value="cef">CEF</option>
+                        <option value="syslog">Syslog</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="sec-head d-block">Select File</label>
+                    <input type="file" class="form-control form-control-sm" id="uploadFile" accept=".json,.log,.txt,.cef">
+                    <div class="form-text text-secondary" style="font-size:.75rem">Accepted: .json, .log, .txt, .cef</div>
+                </div>
+                <div id="uploadResult" class="d-none mt-3 p-3 rounded" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:.85rem"></div>
+            </div>
+            <div class="modal-footer" style="border-color:rgba(255,255,255,.1)">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm btn-success" id="uploadBtn" onclick="uploadLogs()"><i class="fas fa-upload me-1"></i>Upload &amp; Analyse</button>
             </div>
         </div>
     </div>
@@ -254,7 +293,9 @@ async function loadLogs(page=1) {
             <tr onclick="viewLog(${l.id})" style="cursor:pointer">
                 <td style="white-space:nowrap;font-size:.75rem;color:#9ca3af">${new Date(l.timestamp).toLocaleString()}</td>
                 <td><code>${l.ip_address}</code></td>
-                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.attack_type}</td>
+                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                    ${l.suppressed ? '<span title="Noise-filtered / suppressed" style="font-size:.65rem;background:#374151;color:#9ca3af;padding:1px 5px;border-radius:4px;margin-right:4px">SUPPRESSED</span>' : ''}${l.attack_type}
+                </td>
                 <td><span class="sev sev-${l.severity}">${l.severity}</span></td>
                 <td>
                     ${l.mlScore !== null ? `<span class="risk-pill risk-${rc}">${l.mlScore}</span>${bar}` : '<span class="text-secondary" style="font-size:.7rem">—</span>'}
@@ -362,9 +403,11 @@ function applyFilters() {
     const sev = document.getElementById('severityFilter').value;
     const typ = document.getElementById('typeFilter').value;
     const ip  = document.getElementById('ipFilter').value;
+    const showSup = document.getElementById('showSuppressedToggle')?.checked;
     if (sev) currentFilters.severity    = sev;
     if (typ) currentFilters.attack_type = typ;
     if (ip)  currentFilters.ip_address  = ip;
+    if (showSup) currentFilters.suppressed = 'true';
     loadLogs(1);
 }
 
@@ -373,6 +416,8 @@ function clearFilters() {
         const el = document.getElementById(id);
         if (el) el.value='';
     });
+    const tog = document.getElementById('showSuppressedToggle');
+    if (tog) tog.checked = false;
     currentFilters = {};
     loadLogs(1);
 }
@@ -388,6 +433,71 @@ function riskClass(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?
 
 setInterval(()=>loadLogs(currentPage),30000);
 loadLogs(1);
+
+async function uploadLogs() {
+    const fileInput = document.getElementById('uploadFile');
+    const fmt       = document.getElementById('uploadFormat').value;
+    const resultEl  = document.getElementById('uploadResult');
+    const btn       = document.getElementById('uploadBtn');
+
+    if (!fileInput.files.length) {
+        resultEl.className = 'mt-3 p-3 rounded';
+        resultEl.style.borderColor = 'rgba(249,115,22,.4)';
+        resultEl.style.background  = 'rgba(249,115,22,.07)';
+        resultEl.innerHTML = '<i class="fas fa-exclamation-triangle me-2" style="color:#fb923c"></i>Please select a file first.';
+        return;
+    }
+
+    const file = fileInput.files[0];
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading…';
+    resultEl.className = 'mt-3 p-3 rounded';
+    resultEl.style.borderColor = 'rgba(255,255,255,.08)';
+    resultEl.style.background  = 'rgba(255,255,255,.04)';
+    resultEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Parsing and ingesting events…';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('format', fmt);
+
+        const res  = await fetch('/api/logs/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.ok) {
+            resultEl.style.borderColor = 'rgba(34,197,94,.4)';
+            resultEl.style.background  = 'rgba(34,197,94,.07)';
+            resultEl.innerHTML = `
+                <i class="fas fa-check-circle me-2" style="color:#4ade80"></i>
+                <strong>Upload complete.</strong>
+                &nbsp;Ingested <strong>${data.ingested}</strong> of <strong>${data.total}</strong> events.
+                ${data.errors ? `<span class="text-warning ms-2">(${data.errors} parse errors skipped)</span>` : ''}
+                <div class="mt-2 text-secondary" style="font-size:.78rem">Logs are now available in the table below — click Refresh to see them.</div>`;
+            loadLogs(1);
+        } else {
+            resultEl.style.borderColor = 'rgba(239,68,68,.4)';
+            resultEl.style.background  = 'rgba(239,68,68,.07)';
+            resultEl.innerHTML = `<i class="fas fa-times-circle me-2" style="color:#f87171"></i>${data.error || 'Upload failed'}`;
+        }
+    } catch(e) {
+        resultEl.style.borderColor = 'rgba(239,68,68,.4)';
+        resultEl.style.background  = 'rgba(239,68,68,.07)';
+        resultEl.innerHTML = `<i class="fas fa-times-circle me-2" style="color:#f87171"></i>Network error: ${e.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload &amp; Analyse';
+    }
+}
+
+// Reset upload modal state when closed
+document.addEventListener('hidden.bs.modal', (e) => {
+    if (e.target.id === 'uploadModal') {
+        document.getElementById('uploadFile').value = '';
+        const r = document.getElementById('uploadResult');
+        r.className = 'd-none mt-3 p-3 rounded';
+        r.innerHTML = '';
+    }
+});
 </script>
 </body>
 </html>

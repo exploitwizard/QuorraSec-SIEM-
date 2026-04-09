@@ -1,6 +1,6 @@
 # app/metrics.py
 """
-Prometheus metrics definitions for Quorra SIEM.
+Prometheus metrics definitions for Courra-Sec.
 
 Imported by main.py when Config.METRICS_ENABLED is True.
 All counters/histograms are module-level singletons so they survive
@@ -14,13 +14,13 @@ try:
     # HTTP request instrumentation
     # ------------------------------------------------------------------
     HTTP_REQUESTS_TOTAL = Counter(
-        "quorra_http_requests_total",
-        "Total HTTP requests handled by Quorra",
+        "courra-sec_http_requests_total",
+        "Total HTTP requests handled by Courra-Sec",
         ["method", "endpoint", "status_code"],
     )
 
     HTTP_REQUEST_DURATION = Histogram(
-        "quorra_http_request_duration_seconds",
+        "courra-sec_http_request_duration_seconds",
         "HTTP request latency in seconds",
         ["method", "endpoint"],
         buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
@@ -30,13 +30,13 @@ try:
     # Ingest pipeline
     # ------------------------------------------------------------------
     INGEST_EVENTS_TOTAL = Counter(
-        "quorra_ingest_events_total",
+        "courra-sec_ingest_events_total",
         "Total security events ingested (HTTP + WebSocket)",
         ["transport"],   # "http" or "websocket"
     )
 
     INGEST_ERRORS_TOTAL = Counter(
-        "quorra_ingest_errors_total",
+        "courra-sec_ingest_errors_total",
         "Total ingest errors",
     )
 
@@ -44,19 +44,19 @@ try:
     # Detection / alerts
     # ------------------------------------------------------------------
     RULES_TRIGGERED_TOTAL = Counter(
-        "quorra_rules_triggered_total",
+        "courra-sec_rules_triggered_total",
         "Total detection rule triggers",
         ["rule_name", "severity"],
     )
 
     ALERTS_CREATED_TOTAL = Counter(
-        "quorra_alerts_created_total",
+        "courra-sec_alerts_created_total",
         "Total alerts created",
         ["severity", "alert_type"],
     )
 
     ML_ANOMALIES_TOTAL = Counter(
-        "quorra_ml_anomalies_total",
+        "courra-sec_ml_anomalies_total",
         "Total ML anomaly detections",
         ["severity"],
     )
@@ -65,22 +65,22 @@ try:
     # System state gauges
     # ------------------------------------------------------------------
     LOGS_IN_DB = Gauge(
-        "quorra_logs_in_db_total",
+        "courra-sec_logs_in_db_total",
         "Total log entries stored in the database",
     )
 
     ATTACKS_IN_DB = Gauge(
-        "quorra_attacks_in_db_total",
+        "courra-sec_attacks_in_db_total",
         "Total attack records stored in the database",
     )
 
     BLOCKED_IPS = Gauge(
-        "quorra_blocked_ips_total",
+        "courra-sec_blocked_ips_total",
         "Number of currently blocked IP addresses",
     )
 
     WS_CONNECTED = Gauge(
-        "quorra_ws_connected",
+        "courra-sec_ws_connected",
         "1 if the Block Fortress WebSocket connection is active, 0 otherwise",
     )
 

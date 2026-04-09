@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courra-Sec — Superadmin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root{--navy:#0e0e1a;--cyan:#22d3ee;--magenta:#e879f9;--purple:#a78bfa;--border:rgba(255,255,255,.09);}
+        body{background:var(--navy);color:#e5e7eb;font-family:'Segoe UI',sans-serif;min-height:100vh;}
+        .navbar{background:#0a0a14!important;border-bottom:2px solid rgba(239,68,68,.3);}
+        .nav-link{color:rgba(255,255,255,.65)!important;font-size:.85rem;}
+        .superadmin-badge{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:3px 10px;border-radius:99px;font-size:.65rem;font-weight:700;letter-spacing:.06em;}
+        .g-card{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px;}
+        .stat-tile{text-align:center;padding:18px 10px;}
+        .stat-num{font-size:2.2rem;font-weight:800;line-height:1;}
+        .stat-lbl{font-size:.75rem;color:#6b7280;margin-top:4px;text-transform:uppercase;letter-spacing:.06em;}
+        table{width:100%;border-collapse:collapse;}
+        th{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;padding:8px 12px;border-bottom:1px solid var(--border);}
+        td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.875rem;vertical-align:middle;}
+        tr:last-child td{border-bottom:none;}
+        .status-active{color:#22c55e;} .status-suspended{color:#ef4444;}
+        .btn-sm-a{background:rgba(255,255,255,.05);border:1px solid var(--border);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;font-size:.75rem;cursor:pointer;transition:.2s;}
+        .btn-sm-a:hover{background:rgba(255,255,255,.1);color:#fff;}
+        .btn-sm-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;}
+        .btn-sm-danger:hover{background:rgba(239,68,68,.2);}
+        .btn-sm-warn{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.2);color:#fde68a;}
+        .btn-sm-warn:hover{background:rgba(234,179,8,.2);}
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark navbar-expand-lg">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="/dashboard">
+            <i class="fas fa-shield-alt me-2" style="color:var(--cyan)"></i>COURRA-SEC SIEM
+        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="superadmin-badge"><i class="fas fa-crown me-1"></i>SUPERADMIN</span>
+            <span class="text-secondary" style="font-size:.8rem">{{ g_username }}</span>
+            <a class="nav-link" href="/logout" style="color:rgba(255,200,200,.7)!important"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+    <h2 style="font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:4px">
+        <i class="fas fa-crown me-2" style="color:#eab308"></i>Platform Control Panel
+    </h2>
+    <p style="color:rgba(255,255,255,.35);font-size:.85rem;margin-bottom:24px">Global view across all organisations</p>
+
+    <!-- Platform stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="g-card stat-tile">
+                <div class="stat-num" style="color:var(--cyan)">{{ total_orgs }}</div>
+                <div class="stat-lbl">Organisations</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="g-card stat-tile">
+                <div class="stat-num" style="color:var(--purple)">{{ total_users }}</div>
+                <div class="stat-lbl">Total Users</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="g-card stat-tile">
+                <div class="stat-num" style="color:var(--magenta)">{{ total_logs_today }}</div>
+                <div class="stat-lbl">Logs Today</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="g-card stat-tile">
+                <div class="stat-num" style="color:#22c55e">{{ active_orgs }}</div>
+                <div class="stat-lbl">Active Orgs</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orgs table -->
+    <div class="g-card">
+        <h4 style="font-size:.95rem;font-weight:700;color:#fff;margin-bottom:16px">
+            <i class="fas fa-building me-2" style="color:var(--cyan)"></i>All Organisations
+        </h4>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Organisation</th>
+                    <th>Owner Email</th>
+                    <th>Plan</th>
+                    <th>Users</th>
+                    <th>Logs Today</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for o in orgs %}
+            <tr>
+                <td>
+                    <strong>{{ o.name }}</strong>
+                    <div style="font-size:.72rem;color:rgba(255,255,255,.3)">{{ o.slug }}</div>
+                </td>
+                <td style="color:rgba(255,255,255,.5);font-size:.8rem">{{ o.owner_email }}</td>
+                <td><span style="background:rgba(167,139,250,.1);color:var(--purple);border:1px solid rgba(167,139,250,.25);padding:2px 7px;border-radius:99px;font-size:.7rem;font-weight:600;">{{ o.plan }}</span></td>
+                <td style="color:rgba(255,255,255,.6)">{{ o.user_count }} / {{ o.max_users }}</td>
+                <td style="color:rgba(255,255,255,.6)">{{ o.logs_today }}</td>
+                <td>
+                    <span class="status-{{ o.status }}" style="font-size:.8rem;font-weight:600;">
+                        <i class="fas fa-circle me-1" style="font-size:.5rem"></i>{{ o.status }}
+                    </span>
+                </td>
+                <td style="color:rgba(255,255,255,.35);font-size:.78rem">{{ o.created_at.strftime('%d %b %Y') if o.created_at else '—' }}</td>
+                <td>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                        <button class="btn-sm-a" onclick="impersonate({{ o.id }})">
+                            <i class="fas fa-user-secret me-1"></i>Impersonate
+                        </button>
+                        {% if o.status == 'active' %}
+                        <button class="btn-sm-a btn-sm-warn" onclick="suspendOrg({{ o.id }}, '{{ o.name }}')">
+                            <i class="fas fa-pause me-1"></i>Suspend
+                        </button>
+                        {% else %}
+                        <button class="btn-sm-a" onclick="activateOrg({{ o.id }})">
+                            <i class="fas fa-play me-1"></i>Activate
+                        </button>
+                        {% endif %}
+                        <button class="btn-sm-a btn-sm-danger" onclick="deleteOrg({{ o.id }}, '{{ o.name }}')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function impersonate(orgId) {
+    if (!confirm('Impersonate this organisation? You will be redirected to their dashboard.')) return;
+    fetch('/api/superadmin/impersonate/' + orgId, {method:'POST'}).then(r => r.json()).then(d => {
+        if (d.ok) window.location.href = '/dashboard';
+        else alert(d.error);
+    });
+}
+
+function suspendOrg(orgId, name) {
+    if (!confirm(`Suspend "${name}"? Their users will not be able to log in or ingest logs.`)) return;
+    fetch('/api/superadmin/suspend/' + orgId, {method:'POST'}).then(r => r.json()).then(d => {
+        if (d.ok) location.reload(); else alert(d.error);
+    });
+}
+
+function activateOrg(orgId) {
+    fetch('/api/superadmin/activate/' + orgId, {method:'POST'}).then(r => r.json()).then(d => {
+        if (d.ok) location.reload(); else alert(d.error);
+    });
+}
+
+function deleteOrg(orgId, name) {
+    const confirm1 = prompt(`Type "${name}" to permanently delete this organisation and ALL its data:`);
+    if (confirm1 !== name) { alert('Cancelled — name did not match.'); return; }
+    fetch('/api/superadmin/orgs/' + orgId, {method:'DELETE'}).then(r => r.json()).then(d => {
+        if (d.ok) location.reload(); else alert(d.error);
+    });
+}
+</script>
+</body>
+</html>

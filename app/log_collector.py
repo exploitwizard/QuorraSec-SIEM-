@@ -5,51 +5,100 @@ from datetime import datetime, timezone as _tz
 import time
 from app.config import Config
 from app.database import db
-from app.models import LogEntry
+from app.models import LogEntry, Organisation
+
 
 class LogCollector:
-    """Collect logs from Block Fortress application."""
+    """Collect logs from Block Fortress application via authenticated API pull."""
 
     def __init__(self):
         self.block_fortress_url = Config.BLOCK_FORTRESS_URL
         self.ws_url = Config.BLOCK_FORTRESS_WS_URL
         self.last_fetch = None
+        # Admin credentials for Block Fortress API (set via env)
+        self._bf_username = getattr(Config, 'BLOCK_FORTRESS_ADMIN_USER', 'admin')
+        self._bf_password = getattr(Config, 'BLOCK_FORTRESS_ADMIN_PASS', '')
+        self._session = requests.Session()
+        self._authenticated = False
 
-    def fetch_logs_via_api(self):
-        """Fetch logs from Block Fortress API."""
+    def _authenticate(self) -> bool:
+        """Authenticate with Block Fortress and store the session cookie."""
+        if not self._bf_password:
+            return False
         try:
-            # Try to get logs from Block Fortress API
-            response = requests.get(f"{self.block_fortress_url}/api/admin/logs", timeout=5)
-            if response.status_code == 200:
-                logs = response.json()
-                return self.process_logs(logs)
+            resp = self._session.post(
+                f"{self.block_fortress_url}/api/login",
+                json={"username": self._bf_username, "password": self._bf_password},
+                timeout=5,
+            )
+            data = resp.json()
+            self._authenticated = bool(data.get("success"))
+            return self._authenticated
+        except Exception as e:
+            print(f"Block Fortress auth failed: {e}")
+            self._authenticated = False
+            return False
+
+    def fetch_logs_via_api(self, org_id: int):
+        """Fetch security logs from Block Fortress admin API.
+
+        Requires BLOCK_FORTRESS_ADMIN_PASS env var to be set.
+        Returns a list of processed LogEntry objects.
+        """
+        # Need admin credentials to hit /api/admin/logs
+        if not self._authenticated and not self._authenticate():
+            print("Block Fortress: cannot fetch logs — no admin credentials configured")
+            return []
+
+        try:
+            resp = self._session.get(
+                f"{self.block_fortress_url}/api/admin/logs",
+                timeout=5,
+            )
+            if resp.status_code == 401 or resp.status_code == 302:
+                # Session expired — re-authenticate once
+                self._authenticated = False
+                if self._authenticate():
+                    resp = self._session.get(
+                        f"{self.block_fortress_url}/api/admin/logs",
+                        timeout=5,
+                    )
+                else:
+                    return []
+
+            if resp.status_code == 200:
+                logs = resp.json()
+                if org_id and logs:
+                    return self.process_logs(logs, org_id)
         except Exception as e:
             print(f"Error fetching logs via API: {e}")
 
         return []
 
-    def process_logs(self, logs):
-        """Process and store logs."""
+    def process_logs(self, logs, org_id: int):
+        """Process and store logs under a specific org."""
         processed_logs = []
 
         for log_data in logs:
             try:
-                # Create log entry
                 log_entry = LogEntry(
+                    organisation_id=org_id,
                     ip_address=log_data.get('ipAddress', 'unknown'),
                     attack_type=log_data.get('attackType', 'unknown'),
                     endpoint=log_data.get('endpoint', 'unknown'),
                     payload=log_data.get('payload', '')[:1000],
                     user_agent=log_data.get('userAgent'),
                     severity=log_data.get('severity', 'medium'),
-                    timestamp=datetime.fromisoformat(log_data.get('timestamp').replace('Z', '+00:00')).astimezone(_tz.utc).replace(tzinfo=None)
-                    if log_data.get('timestamp') else datetime.utcnow(),
-                    raw_data=json.dumps(log_data)
+                    timestamp=(
+                        datetime.fromisoformat(
+                            log_data['timestamp'].replace('Z', '+00:00')
+                        ).astimezone(_tz.utc).replace(tzinfo=None)
+                        if log_data.get('timestamp') else datetime.utcnow()
+                    ),
+                    raw_data=json.dumps(log_data),
                 )
-
                 db.session.add(log_entry)
                 processed_logs.append(log_entry)
-
             except Exception as e:
                 print(f"Error processing log: {e}")
 
@@ -58,46 +107,13 @@ class LogCollector:
 
         return processed_logs
 
-    def simulate_test_logs(self):
-        """Generate simulated logs for testing when Block Fortress is not available."""
-        print("Warning: Block Fortress not available. Generating test logs...")
-
-        test_logs = [
-            {
-                'ipAddress': '192.168.1.100',
-                'attackType': 'SQL Injection Attempt',
-                'endpoint': '/api/login',
-                'payload': 'username=admin\' OR \'1\'=\'1&password=test',
-                'userAgent': 'Mozilla/5.0 (Test)',
-                'severity': 'high',
-                'timestamp': datetime.utcnow().isoformat()
-            },
-            {
-                'ipAddress': '10.0.0.50',
-                'attackType': 'Brute Force Attempt',
-                'endpoint': '/api/login',
-                'payload': 'username=admin&password=password123',
-                'userAgent': 'Python/3.9',
-                'severity': 'medium',
-                'timestamp': datetime.utcnow().isoformat()
-            },
-            {
-                'ipAddress': '172.16.0.25',
-                'attackType': 'XSS Attack',
-                'endpoint': '/api/contact',
-                'payload': 'name=<script>alert(1)</script>&email=test@test.com',
-                'userAgent': 'Mozilla/5.0 (Attack)',
-                'severity': 'high',
-                'timestamp': datetime.utcnow().isoformat()
-            }
-        ]
-
-        return self.process_logs(test_logs)
-
-    def check_block_fortress_availability(self):
-        """Check if Block Fortress is available."""
+    def check_block_fortress_availability(self) -> bool:
+        """Check if Block Fortress is reachable."""
         try:
-            response = requests.get(f"{self.block_fortress_url}/api/products", timeout=3)
+            response = requests.get(
+                f"{self.block_fortress_url}/api/products",
+                timeout=3,
+            )
             return response.status_code == 200
-        except:
+        except Exception:
             return False
