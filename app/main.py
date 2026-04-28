@@ -32,6 +32,7 @@ from app.models import (
     Organisation, CourraSecUser, LogEntry, Alert, Attack,
     IPBlocklist, CustomRule, SoarAction, ApiKeyUsage,
 )
+from app.report_engine import run_scheduled_reports
 from app.metrics import (
     PROMETHEUS_AVAILABLE,
     HTTP_REQUESTS_TOTAL, HTTP_REQUEST_DURATION,
@@ -171,10 +172,11 @@ def get_pipeline(org_id: int):
 # =============================================================================
 # State
 # =============================================================================
-monitoring_active = True
-ws_connected      = False
-_geo_cache: dict  = {}
-MAX_GEO_CACHE     = 1000
+monitoring_active        = True
+ws_connected             = False
+_baseline_reporter_status = "starting"
+_geo_cache: dict         = {}
+MAX_GEO_CACHE            = 1000
 
 # =============================================================================
 # Auth / Tenant helpers
@@ -904,13 +906,14 @@ def health():
 
     status = "healthy" if db_ok else "degraded"
     return jsonify({
-        "status":       status,
-        "version":      "2.0.0",
-        "db":           "ok" if db_ok else "error",
-        "ml":           ml_pipeline is not None,
-        "monitoring":   monitoring_active,
-        "ws_connected": ws_connected,
-        "timestamp":    datetime.utcnow().isoformat() + "Z",
+        "status":             status,
+        "version":            "2.0.0",
+        "db":                 "ok" if db_ok else "error",
+        "ml":                 ml_pipeline is not None,
+        "monitoring":         monitoring_active,
+        "ws_connected":       ws_connected,
+        "baseline_reporter":  _baseline_reporter_status,
+        "timestamp":          datetime.utcnow().isoformat() + "Z",
     }), 200 if db_ok else 503
 
 
@@ -3217,6 +3220,37 @@ def _playbook_run_cleanup_loop():
             logger.warning("PlaybookRun cleanup error: %s", exc)
 
 Thread(target=_playbook_run_cleanup_loop, daemon=True).start()
+
+# =============================================================================
+# Weekly report scheduler — fires every Monday at 08:00 UTC
+# =============================================================================
+
+def _seconds_until_next_monday_0800() -> float:
+    """Return seconds from now until the next Monday 08:00 UTC."""
+    now = datetime.utcnow()
+    # days_ahead: 0 = this Monday, positive = days until next Monday
+    days_ahead = (7 - now.weekday()) % 7  # weekday() 0=Mon … 6=Sun
+    if days_ahead == 0 and (now.hour, now.minute) >= (8, 0):
+        days_ahead = 7  # already past 08:00 this Monday — use next week
+    next_run = now.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+    return max((next_run - datetime.utcnow()).total_seconds(), 0)
+
+
+def _weekly_report_scheduler_loop():
+    global _baseline_reporter_status
+    _baseline_reporter_status = "active"
+    while True:
+        delay = _seconds_until_next_monday_0800()
+        logger.info("WeeklyReportScheduler: next run in %.0f seconds (Monday 08:00 UTC)", delay)
+        time.sleep(delay)
+        try:
+            run_scheduled_reports(app.app_context())
+            logger.info("WeeklyReportScheduler: scheduled reports triggered")
+        except Exception as exc:
+            logger.error("WeeklyReportScheduler: error triggering reports: %s", exc)
+
+
+Thread(target=_weekly_report_scheduler_loop, daemon=True).start()
 
 # =============================================================================
 # Startup

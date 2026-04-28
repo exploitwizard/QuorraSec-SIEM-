@@ -388,7 +388,7 @@ def _send_report(sr: ScheduledReport):
         'plain',
     ))
 
-    attachment = MIMEApplication(content.encode())
+    attachment = MIMEApplication(content if isinstance(content, bytes) else content.encode())
     attachment['Content-Disposition'] = f'attachment; filename="{filename}"'
     msg.attach(attachment)
 

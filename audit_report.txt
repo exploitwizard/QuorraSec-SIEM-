@@ -1,0 +1,112 @@
+CourraSec — Audit Report (Phase 1)
+=====================================
+Boot test: app starts OK on port 5001 with INGEST_API_KEY.
+All 23 UI pages return 200 when authenticated.
+All 18 GET API endpoints return 200.
+All 8 mutation POST endpoints succeed except where noted below.
+
+NOTE: The original prompt assumed an `app/ml/` package (ml_pipeline.py,
+anomaly_detection.py, ueba.py, risk_scorer.py, attack_graph.py).
+The actual code consolidates these into a single `app/ml.py`. Audit/fix
+work was applied against the real file layout.
+
+BUGS FOUND
+============================================================
+
+[B1] CRITICAL — /ingest returns 500 for invalid JSON or empty body
+  File: app/main.py:1692-1694, also api_ioc_sync_otx:2339
+  Cause: `request.get_json(force=True, silent=False)` raises
+         werkzeug.exceptions.BadRequest, caught by the broad
+         `except Exception` clause → returned as 500.
+  Repro: curl -X POST /ingest -d 'not json'  → 500
+         curl -X POST /ingest -d ''           → 500
+  Fix:   Use silent=True and validate the result; return 400.
+
+[B2] CRITICAL — /api/threat-intel/sync/otx returns 500 if body is missing
+  File: app/main.py:2339
+  Cause: `request.get_json(force=True, silent=True).get("api_key", "")`
+         — get_json returns None when body is empty, then .get() crashes
+         with AttributeError.
+
+[B3] CRITICAL — /api/rules POST always fails with "Missing rule_name"
+  File: app/main.py:1829-1832
+  Cause: `_rule_evaluator.validate(rule_def)` is called BEFORE
+         `rule_def.setdefault("rule_name", name)`. Validator requires
+         rule_name; rejects every visual/JSON rule submission.
+  Repro: POST /api/rules with valid level-1 definition → 400.
+  Fix:   Move setdefault before validate.
+
+[B4] CRITICAL — Syslog listener writes LogEntry without organisation_id
+  File: app/syslog_listener.py:97-107
+  Cause: organisation_id is NOT NULL on LogEntry but the syslog handler
+         omits it → IntegrityError on every received syslog message.
+  Fix:   Look up the default org and assign organisation_id.
+
+[B5] CRITICAL — threat_intel._record_hit() runs in daemon thread without app context
+  File: app/threat_intel.py:301-316
+  Cause: `threading.Thread(target=_record_hit ...)` calls
+         db.session.get + commit outside Flask app context →
+         RuntimeError: "Working outside of application context".
+  Fix:   Pass current_app._get_current_object() and wrap in app_context.
+
+[B6] HIGH — alert_system notification threads lose Flask context
+  File: app/alert_system.py:39-43, 63-67
+  Cause: The dispatcher thread reads alert.severity / alert.created_at
+         after the parent commit. SQLAlchemy may attempt lazy load on
+         a detached instance from a different thread.
+  Fix:   Snapshot the fields needed for notifications into a plain dict
+         BEFORE spawning the thread.
+
+[B7] HIGH — Block Fortress WS reconnect loses exponential backoff
+  File: app/main.py:3179
+  Cause: `delay = Config.WS_RECONNECT_DELAY` resets *every* loop
+         iteration (before run_forever), so backoff after `delay *= 2`
+         is wiped on the next attempt. Constant 5 s + jitter forever.
+  Fix:   Move the reset to fire only after a *successful* connection
+         (inside on_open).
+
+[B8] HIGH — Block Fortress connection-refused log spam
+  File: app/main.py:3145, on_ws_error
+  Cause: Every reconnect attempt logs at WARNING level. Without rate
+         limiting this floods logs when BF is offline (the common case).
+  Fix:   Suppress duplicate errors when not connected.
+
+[B9] HIGH — _increment_usage races on UNIQUE(org, date)
+  File: app/main.py:1376-1383
+  Cause: First ingest of the day from two concurrent threads can both
+         create the ApiKeyUsage row → IntegrityError, ingest fails 500.
+  Fix:   Wrap in try/except IntegrityError → rollback + retry.
+
+[B10] MEDIUM — /api/logs/export syslog format crashes when severity is None
+  File: app/main.py:1085-1095
+  Cause: `l.severity.upper()` raises AttributeError on NULL severity.
+  Fix:   Use `(l.severity or "info").upper()`.
+
+[B11] MEDIUM — rules_engine bruteforce uses hardcoded 2-min window
+  File: app/rules_engine.py:107
+  Cause: Ignores Config.BRUTEFORCE_WINDOW (configurable default 120s).
+  Fix:   Use the configured value.
+
+[B12] MEDIUM — playbook_engine PlaybookRun retention loop doesn't filter by org_id correctly across deletes
+  File: app/main.py:3214
+  Cause: Bulk delete doesn't synchronize_session; not actually broken,
+         but emits SAWarning. Add synchronize_session=False.
+
+[B13] MEDIUM — _process_ingest re-raises broad exceptions; ingest 500s
+  File: app/main.py:1436-1652
+  Cause: Any unexpected error inside ingest propagates → 500. Should
+         degrade gracefully (record + continue) for non-DB errors.
+
+[B14] LOW — `register` route doesn't guard `terms` checkbox in edge case
+  Cosmetic — already handled.
+
+[B15] LOW — datetime.utcnow() deprecation warnings (Python 3.13)
+  Cosmetic — does not break, noisy in logs.
+
+============================================================
+FIX PLAN
+============================================================
+Phase 2A — Critical bugs B1, B2, B3, B4, B5
+Phase 2B — High stability bugs B6, B7, B8, B9
+Phase 2C — Medium fixes B10, B11, B12, B13
+Phase 4   — Smoke test all routes again, verify checklist.

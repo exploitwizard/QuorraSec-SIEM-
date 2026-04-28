@@ -73,7 +73,7 @@ class AlertSystem:
             db.session.rollback()
             return None
 
-    def create_ml_alert(self, ml_result: dict, log_entry=None) -> Alert | None:
+    def create_ml_alert(self, ml_result: dict, log_entry=None, org_id: int = None) -> Alert | None:
         """Create an alert from an ML pipeline result dict."""
         severity   = ml_result.get("severity", "info").lower()
         risk_score = ml_result.get("risk_score", 0)
@@ -112,6 +112,7 @@ class AlertSystem:
             alert_type=f"ML:{threat}",
             severity=severity,
             details=details,
+            organisation_id=org_id,
         )
 
     # ------------------------------------------------------------------

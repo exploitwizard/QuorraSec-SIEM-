@@ -36,12 +36,17 @@ def _eval_condition(event: dict, cond: dict) -> bool:
     value = cond.get('value', '')
 
     actual = str(event.get(field, '') or '').lower()
-    value_s = str(value).lower() if not isinstance(value, list) else [str(v).lower() for v in value]
+    if isinstance(value, list):
+        value_list = [str(v).lower() for v in value]
+        value_s    = value_list[0] if value_list else ''
+    else:
+        value_s    = str(value).lower()
+        value_list = [value_s]
 
     if op == 'eq':
-        return actual == value_s
+        return actual in value_list
     elif op == 'neq':
-        return actual != value_s
+        return actual not in value_list
     elif op == 'contains':
         return value_s in actual
     elif op == 'not_contains':
@@ -51,9 +56,9 @@ def _eval_condition(event: dict, cond: dict) -> bool:
     elif op == 'ends_with':
         return actual.endswith(value_s)
     elif op == 'in':
-        return actual in value_s
+        return actual in value_list
     elif op == 'not_in':
-        return actual not in value_s
+        return actual not in value_list
     elif op == 'regex':
         try:
             return bool(re.search(value_s, actual))

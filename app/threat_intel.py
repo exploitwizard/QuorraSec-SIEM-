@@ -367,7 +367,7 @@ def expire_old_indicators(org_id: int) -> int:
     expired = (
         ThreatIndicator.query
         .filter_by(organisation_id=org_id, is_active=True)
-        .filter(ThreatIndicator.expires_at != None)
+        .filter(ThreatIndicator.expires_at.isnot(None))
         .filter(ThreatIndicator.expires_at < now)
         .all()
     )

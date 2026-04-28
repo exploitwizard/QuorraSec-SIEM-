@@ -11,9 +11,9 @@ geoip2>=4.7.0
 werkzeug>=2.3.7
 websocket-client>=1.6.3
 scikit-learn>=1.3.0
-matplotlib==3.8.0
-pandas==2.1.3
-numpy==1.26.0
+matplotlib>=3.9.0
+pandas>=2.2.0
+numpy>=2.0.0
 
 # Cross-platform production WSGI server (works on Windows, Linux, macOS)
 waitress>=2.1.2
