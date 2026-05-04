@@ -1,0 +1,73 @@
+ML Analysis Display Bug — Audit Report
+========================================
+Date: 2026-05-02
+
+QUESTION 1: Is ml_pipeline.analyze() actually called in /ingest?
+-----------------------------------------------------------------
+YES. In _process_ingest() (main.py:1730-1758), pipeline.analyze() is called
+with the log's fields. The result is stored in ml_result.
+
+QUESTION 2: Is the ML result stored anywhere in the database?
+-------------------------------------------------------------
+PARTIALLY — and incorrectly. The ML result is only used to create an Alert
+when ml_result["severity"] in ("high", "critical"). It is NEVER written back
+into the LogEntry's raw_data or any ML-specific column. After the function
+returns, the ml_result is discarded.
+
+QUESTION 3: Does LogEntry model have ML columns?
+------------------------------------------------
+NO. LogEntry (models.py:129-156) only has:
+  id, organisation_id, ip_address, attack_type, endpoint,
+  payload, user_agent, severity, timestamp, raw_data, suppressed
+
+No ml_risk_score, ml_anomaly_score, ml_is_anomaly, ml_analysis, etc.
+
+QUESTION 4: Does the log detail route pass ml_data to the template?
+-------------------------------------------------------------------
+There is NO /api/logs/<id> route at all. The template reads from the list
+endpoint /api/logs, then parses raw_data client-side to extract ML fields.
+But raw_data = json.dumps(original_ingest_payload) — the ML result was
+computed AFTER raw_data was set and is never merged back.
+
+QUESTION 5: Does the template show "ML models not trained yet" as fallback?
+---------------------------------------------------------------------------
+YES. In logs.html line 378:
+  const mlScore = raw.ml_risk_score || raw.risk_score || null;
+  ...
+  ${mlScore !== null ? `...render scores...` : '<p class="text-secondary small">ML models not trained yet.</p>'}
+
+Since raw_data never contains risk_score (it's the original ingest payload),
+mlScore is always null, so the fallback always shows.
+
+QUESTION 6: Is IsolationForest actually trained?
+------------------------------------------------
+NO for new deployments. AnomalyDetector._retrain() is only called when
+len(self._buffer) >= 20 AND len(self._buffer) % 100 == 0
+(i.e. at 100, 200, 300... events). Until then, _trained=False and
+update_and_predict() returns False (no anomaly).
+
+However, even with _trained=False, RiskScorer.score() still produces a
+valid risk_score based on severity + attack type. The bug is that this
+score is computed but immediately discarded without being stored.
+
+ROOT CAUSE SUMMARY
+------------------
+1. LogEntry has no ML columns — nowhere to store results persistently
+2. ML result is computed in _process_ingest() but never merged into raw_data
+3. The template reads ML data from raw_data (which only has ingest payload)
+4. Because raw_data has no ML fields, mlScore is always null
+5. Null mlScore triggers "ML models not trained yet" message
+6. IsolationForest doesn't train until 100+ logs, but statistical fallback
+   in RiskScorer already produces valid scores — they just aren't stored
+
+FIXES APPLIED
+-------------
+1. Added ML columns to LogEntry model (models.py)
+2. In _process_ingest(), ML result is now merged into raw_data immediately
+   and stored in the new ML columns
+3. Added _run_ml_and_store() for background reanalysis of old logs
+4. Added auto_train_if_ready() to trigger IsolationForest training
+5. Added /api/logs/<id> detail route returning ML data
+6. Added /api/ml/train and /api/ml/status routes
+7. Added fromjson Jinja2 filter
+8. Created migrate_ml_fix.py for DB migration

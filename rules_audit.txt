@@ -1,0 +1,146 @@
+COURRA-SEC RULES ENGINE AUDIT
+Generated: 2026-05-01
+Audited files: app/main.py, app/rules_engine.py, app/models.py, app/alert_system.py
+═══════════════════════════════════════════════════════════════════════════════
+
+QUESTION 1: Is evaluate_custom_rules() or equivalent called from /ingest?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES — but conditionally (see Bug 1 below).
+Call chain: /ingest → _process_ingest() → rules_engine.check_rules(log) →
+            self.evaluate_custom_rules(log_entry)
+The call exists and reaches evaluate_custom_rules, BUT it is gated by the
+critical guard described in Bug 1.
+
+QUESTION 2: Is evaluate_custom_rules() called AFTER the log is saved to DB?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES.
+main.py lines 1511–1523: LogEntry created, db.session.add(), db.session.commit()
+main.py line 1526: rules_engine.check_rules(log) called after the commit.
+The log always has a valid id when rules are evaluated.
+
+QUESTION 3: Does evaluate_custom_rules() actually run rule logic or just return?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES, it does run rule logic — but only for the FIRST matching rule
+(see Bug 2) and only when no built-in rule fired (see Bug 1).
+rules_engine.py lines 311–379: builds event_dict, loads CustomRule rows,
+iterates rules, calls evaluator.evaluate() for L1/L2 and dsl_runner.execute()
+for L3. Logic is real and correct — the bugs are structural.
+
+QUESTION 4: Does the Python DSL level actually exec() the rule code?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES.
+rule_builder.py PythonDSLRunner.execute() → _exec_restricted() or _exec_basic()
+Both use exec(compiled_code, globals, locals) and call the rule() function.
+RestrictedPython sandbox is used when installed. The sandbox blocks bare
+"import re" statements inside rule code — resolved by the sandbox toggle.
+
+QUESTION 5: Does the YAML/JSON DSL actually evaluate conditions?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES.
+rule_builder.py RuleEvaluator.evaluate() correctly parses conditions[] and
+logic (AND/OR), applies _apply_operator() for all 12 simple operators,
+and _eval_temporal() for count_within / unique_count_within / rate_within.
+The evaluator is fully functional.
+
+QUESTION 6: Does the visual builder actually check conditions against log fields?
+─────────────────────────────────────────────────────────────────────────────
+ANSWER: YES.
+Level 1 (visual) rules store their conditions as JSON in rule_definition
+(same format as Level 2). evaluate_custom_rules handles both with:
+  if rule.level in (1, 2): evaluator.evaluate(json.loads(rule.rule_definition), event_dict)
+The same RuleEvaluator processes both levels.
+
+═══════════════════════════════════════════════════════════════════════════════
+BUGS FOUND
+═══════════════════════════════════════════════════════════════════════════════
+
+BUG 1 — CRITICAL: Custom rules silently skipped when any built-in rule fires
+─────────────────────────────────────────────────────────────────────────────
+File: app/rules_engine.py, lines 88–93
+Code:
+    # Custom rules (Levels 1, 2, 3)
+    if not results["triggered"]:          ← BUG: this guard
+        r = self.evaluate_custom_rules(log_entry)
+        if r["triggered"]:
+            results.update(r)
+
+If ANY of the five built-in rules fires (brute_force, geo_velocity,
+admin_privilege, os_command_injection, multiple_attack_types), the entire
+custom rules evaluation is skipped. Custom rules are never evaluated for
+real-world logs that trigger even one built-in rule.
+
+Fix: Remove custom rules from check_rules entirely. Add a standalone
+evaluate_all_custom_rules() called unconditionally from _process_ingest
+after check_rules completes.
+
+BUG 2 — HIGH: Only the first matching custom rule fires per log
+─────────────────────────────────────────────────────────────────────────────
+File: app/rules_engine.py, lines 354–375
+Code:
+    if triggered:
+        ...
+        return {      ← returns immediately on first match
+            "triggered": True,
+            ...
+        }
+
+After one custom rule triggers, the for-loop is exited. Any remaining
+custom rules are never evaluated for that log event. If an org has 10
+custom rules and events 2, 5, 8 all match, only the first is reported.
+
+Fix: Iterate ALL rules without early return. Create an Alert + Attack
+record for each matched rule.
+
+BUG 3 — HIGH: No sandbox toggle — Python DSL always sandboxed
+─────────────────────────────────────────────────────────────────────────────
+The RestrictedPython sandbox blocks bare "import re" inside rule functions,
+making regex-based detection rules impossible without workarounds. There is
+no per-organisation setting to allow trusted admins to use full Python.
+
+No OrganisationSettings model exists.
+No /api/settings/sandbox endpoint exists.
+No sandbox toggle in the UI exists.
+
+Fix: Add OrganisationSettings model with python_dsl_sandbox column (default
+True). Add API endpoints. Add unsandboxed execution path. Add UI toggle.
+
+OBSERVATION: evaluate_custom_rules misses YAML fallback in L2
+─────────────────────────────────────────────────────────────────────────────
+File: app/rules_engine.py, line 343
+Code:
+    rule_def = json.loads(rule.rule_definition)
+
+If rule_definition was saved as YAML text (not JSON), this raises
+JSONDecodeError and the rule silently errors out. RuleEvaluator.parse_yaml()
+handles YAML correctly but is never called from evaluate_custom_rules.
+
+Fix: Try JSON first, then fall back to YAML in the new evaluation path.
+
+═══════════════════════════════════════════════════════════════════════════════
+FIXES APPLIED (see commit)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. rules_engine.py
+   - Removed evaluate_custom_rules from check_rules (built-in rules only)
+   - Added evaluate_all_custom_rules(log_entry, org_id) — evaluates ALL active
+     custom rules, creates Alert + Attack per match, handles IP blocking
+   - Added _is_sandbox_enabled(org_id) — reads OrganisationSettings
+   - Added _execute_unrestricted() — full Python when sandbox OFF
+   - Added JSON→YAML fallback for Level 2 rule definitions
+
+2. models.py
+   - Added OrganisationSettings model with python_dsl_sandbox column
+
+3. main.py
+   - _process_ingest: added evaluate_all_custom_rules(log, org_id) call
+     after built-in rules block, unconditionally on every log
+   - register(): added OrganisationSettings creation for new orgs
+   - Added GET /api/settings/sandbox
+   - Added POST /api/settings/sandbox (with disable confirmation)
+   - Added POST /api/rules/test
+
+4. templates/settings/organisation.html
+   - Added Python DSL Sandbox security card
+
+5. examples/nmap_detection_rule.py  — example rules (sandbox ON and OFF)
+6. migrate_rules_fix.py             — one-time db migration

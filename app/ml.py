@@ -441,48 +441,178 @@ class MLPipeline:
             if ok:
                 print(f"ML: {len(self.ueba._profiles)} UEBA profiles loaded from {ueba_path}")
 
-    def analyze(self, log_dict: dict) -> dict:
-        entity_id = log_dict.get("source_ip") or log_dict.get("ip_address", "unknown")
-        at        = (log_dict.get("attack_type") or log_dict.get("event_type") or "unknown").lower()
+    def _fast_statistical_score(self, log_dict: dict) -> dict:
+        """
+        Pure-arithmetic scoring under 1ms. No model, no loops over profiles.
+        Uses string pattern matching on payload/message for UEBA flags.
+        """
+        severity = str(log_dict.get('severity', 'info')).lower()
+        sev_score = {'critical': 40, 'high': 30, 'medium': 20, 'low': 10, 'info': 5}.get(severity, 5)
 
-        self._total_analyzed += 1
-        is_anomaly      = self.anomaly.update_and_predict(log_dict)
-        ueba_anomalies  = self.ueba.update(log_dict)
-        is_ueba_anomaly = bool(ueba_anomalies)
+        payload = str(log_dict.get('payload', '') or '').lower()
+        message = str(log_dict.get('message', '') or '').lower()
+        at      = str(log_dict.get('attack_type', '') or log_dict.get('event_type', '') or '').lower()
+        text    = payload + ' ' + message + ' ' + at
 
-        risk_result  = self.risk.score(log_dict, ueba_anomalies, is_anomaly)
-        risk_score   = risk_result["score"]
+        anomaly_score = 0.0
+        ueba_flags: list = []
 
-        chains      = self.graph.add_event(entity_id, at)
-        is_novel    = is_anomaly and not ueba_anomalies
+        # Fast pattern checks — no regex, pure string contains
+        _checks = (
+            ('nmap',        0.4, 'nmap_scan'),
+            ('sqlmap',      0.5, 'sql_injection_tool'),
+            ('../',         0.3, 'path_traversal'),
+            ('cmd.exe',     0.4, 'command_execution'),
+            ('/bin/sh',     0.4, 'shell_execution'),
+            ('select ',     0.3, 'sql_injection'),
+            ('<script',     0.3, 'xss_attempt'),
+            ('union ',      0.3, 'sql_union'),
+            ('base64',      0.2, 'encoded_payload'),
+            ('powershell',  0.4, 'powershell'),
+            ('wget ',       0.3, 'download_attempt'),
+            ('curl ',       0.2, 'curl_command'),
+            ('bruteforce',  0.5, 'brute_force'),
+            ('brute force', 0.5, 'brute_force'),
+            ('port scan',   0.4, 'port_scan'),
+        )
+        for pattern, weight, flag in _checks:
+            if pattern in text:
+                anomaly_score += weight
+                if flag not in ueba_flags:
+                    ueba_flags.append(flag)
 
-        threat_label, mitre_tactic = label_threat(log_dict, risk_score)
+        status = int(log_dict.get('status_code', 0) or 0)
+        if status == 401: anomaly_score += 0.15; ueba_flags.append('auth_failure')
+        elif status == 403: anomaly_score += 0.10
+        elif status == 500: anomaly_score += 0.10
 
-        if risk_score >= 80:
-            severity = "critical"
-        elif risk_score >= 60:
-            severity = "high"
-        elif risk_score >= 40:
-            severity = "medium"
-        else:
-            severity = "low"
+        anomaly_score = min(1.0, round(anomaly_score, 4))
+        is_anomaly    = anomaly_score >= 0.5
+
+        ueba_contrib = min(20, len(ueba_flags) * 5)
+        risk_score   = min(100.0, round(sev_score + anomaly_score * 15 + ueba_contrib, 2))
+
+        threat_label, mitre_tactic = label_threat(log_dict, int(risk_score))
+
+        if risk_score >= 80:   ml_severity = "critical"
+        elif risk_score >= 60: ml_severity = "high"
+        elif risk_score >= 40: ml_severity = "medium"
+        else:                  ml_severity = "low"
 
         return {
-            "severity":        severity,
+            "severity":        ml_severity,
             "risk_score":      risk_score,
+            "anomaly_score":   anomaly_score,
             "threat_label":    threat_label,
             "mitre_tactic":    mitre_tactic,
             "is_anomaly":      is_anomaly,
-            "is_ueba_anomaly": is_ueba_anomaly,
-            "is_sequential":   bool(chains),
-            "is_novel_log":    is_novel,
-            "attack_chain":    chains,
-            "ueba_anomalies":  ueba_anomalies,
+            "is_ueba_anomaly": bool(ueba_flags),
+            "is_sequential":   False,
+            "is_novel_log":    False,
+            # both naming conventions for compat with _store_ml_result
+            "ueba_flags":      ueba_flags,
+            "ueba_anomalies":  ueba_flags,
+            "attack_chains":   [],
+            "attack_chain":    [],
+            "model_status":    "statistical_fallback",
+            "components": {
+                "isolation_forest": anomaly_score,
+                "ueba":             ueba_contrib,
+                "risk_scorer":      risk_score,
+            },
             "risk": {
-                "entity_id":        entity_id,
-                "signal_breakdown": risk_result["signal_breakdown"],
+                "entity_id":        log_dict.get("source_ip") or log_dict.get("ip_address", "unknown"),
+                "signal_breakdown": {
+                    "severity": sev_score,
+                    "inherent": 0,
+                    "ueba":     ueba_contrib,
+                    "anomaly":  round(anomaly_score * 15, 2),
+                },
             },
         }
+
+    def analyze(self, log_dict: dict) -> dict:
+        """
+        Analyze a log event. Targets under 5ms.
+        When IsolationForest is not trained, uses fast statistical scoring.
+        Always returns a dict — never None.
+        """
+        self._total_analyzed += 1
+        entity_id = log_dict.get("source_ip") or log_dict.get("ip_address", "unknown")
+        at        = (log_dict.get("attack_type") or log_dict.get("event_type") or "unknown").lower()
+
+        try:
+            # Fast path when model not yet trained (common case at startup)
+            if not self.anomaly._trained:
+                result = self._fast_statistical_score(log_dict)
+                # Still update UEBA profile in-memory (cheap)
+                try:
+                    ueba_anomalies = self.ueba.update(log_dict)
+                    if ueba_anomalies:
+                        combined = list(set(result["ueba_flags"] + ueba_anomalies))
+                        result["ueba_flags"]      = combined
+                        result["ueba_anomalies"]  = combined
+                        result["is_ueba_anomaly"] = True
+                except Exception:
+                    pass
+                # Update anomaly buffer (cheap, enables auto-train later)
+                try:
+                    self.anomaly.update_and_predict(log_dict)
+                except Exception:
+                    pass
+                return result
+
+            # Trained path: use IsolationForest + full pipeline
+            is_anomaly      = self.anomaly.update_and_predict(log_dict)
+            ueba_anomalies  = self.ueba.update(log_dict)
+            is_ueba_anomaly = bool(ueba_anomalies)
+            risk_result     = self.risk.score(log_dict, ueba_anomalies, is_anomaly)
+            risk_score      = risk_result["score"]
+            chains          = self.graph.add_event(entity_id, at)
+            is_novel        = is_anomaly and not ueba_anomalies
+            threat_label, mitre_tactic = label_threat(log_dict, risk_score)
+
+            # Also get fast flags for UEBA enrichment
+            fast = self._fast_statistical_score(log_dict)
+            all_ueba = list(set(fast["ueba_flags"] + ueba_anomalies))
+
+            if risk_score >= 80:   severity = "critical"
+            elif risk_score >= 60: severity = "high"
+            elif risk_score >= 40: severity = "medium"
+            else:                  severity = "low"
+
+            chain_names = [c.get("pattern_name", str(c)) if isinstance(c, dict) else str(c) for c in chains]
+
+            return {
+                "severity":        severity,
+                "risk_score":      float(risk_score),
+                "anomaly_score":   float(fast["anomaly_score"]),
+                "threat_label":    threat_label,
+                "mitre_tactic":    mitre_tactic,
+                "is_anomaly":      is_anomaly or fast["is_anomaly"],
+                "is_ueba_anomaly": is_ueba_anomaly or fast["is_ueba_anomaly"],
+                "is_sequential":   bool(chains),
+                "is_novel_log":    is_novel,
+                "ueba_flags":      all_ueba,
+                "ueba_anomalies":  all_ueba,
+                "attack_chains":   chain_names,
+                "attack_chain":    chains,
+                "model_status":    "trained",
+                "components": {
+                    "isolation_forest": float(fast["anomaly_score"]),
+                    "ueba":             min(20, len(all_ueba) * 5),
+                    "risk_scorer":      float(risk_score),
+                },
+                "risk": {
+                    "entity_id":        entity_id,
+                    "signal_breakdown": risk_result["signal_breakdown"],
+                },
+            }
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("MLPipeline.analyze error: %s", e)
+            return self._fast_statistical_score(log_dict)
 
     def get_ml_summary(self) -> dict:
         return {

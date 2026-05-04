@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
 import json
+import logging
 from app.database import db
 from app.models import LogEntry, IPBlocklist, Attack
 from app.config import Config
 import geoip2.database
 import geoip2.errors
 from math import radians, sin, cos, sqrt, atan2
+
+logger = logging.getLogger(__name__)
 
 
 class RulesEngine:
@@ -85,11 +88,10 @@ class RulesEngine:
             results.update(r)
             results["block_ip"] = True
 
-        # Custom rules (Levels 1, 2, 3)
-        if not results["triggered"]:
-            r = self.evaluate_custom_rules(log_entry)
-            if r["triggered"]:
-                results.update(r)
+        # Custom rules are evaluated separately by evaluate_all_custom_rules()
+        # called unconditionally from _process_ingest after this method returns.
+        # This ensures all active custom rules run regardless of whether a
+        # built-in rule already fired.
 
         return results
 
@@ -389,3 +391,190 @@ class RulesEngine:
         dlon = lon2 - lon1
         a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
         return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+# =============================================================================
+# Standalone custom-rule evaluator — called from _process_ingest
+# =============================================================================
+
+def evaluate_all_custom_rules(log_entry, org_id):
+    """
+    Main entry point called from _process_ingest after log is saved.
+    Evaluates ALL active custom rules for the organisation against the
+    log entry.  Creates an Alert + Attack record for every rule that
+    matches.  Catches all exceptions so a broken rule never crashes ingest.
+    """
+    try:
+        _run_custom_rules(log_entry, org_id)
+    except Exception as e:
+        logger.error("Custom rules evaluation failed for log %s: %s", log_entry.id, e)
+
+
+def _run_custom_rules(log_entry, org_id):
+    """Core iteration — evaluate every enabled custom rule for the org."""
+    from app.models import CustomRule, Alert, Attack as AttackModel, IPBlocklist
+    from app.rule_builder import evaluator, dsl_runner
+    import json as _json
+
+    event_dict = {
+        "ip_address":  log_entry.ip_address,
+        "attack_type": log_entry.attack_type,
+        "endpoint":    log_entry.endpoint,
+        "payload":     log_entry.payload,
+        "severity":    log_entry.severity,
+        "user_agent":  log_entry.user_agent,
+        "timestamp":   log_entry.timestamp.isoformat() if log_entry.timestamp else None,
+    }
+
+    # Feed temporal-operator history so count_within / rate_within work
+    evaluator.add_to_history(event_dict)
+
+    rules = CustomRule.query.filter_by(enabled=True, organisation_id=org_id).all()
+
+    for rule in rules:
+        try:
+            triggered = False
+            error     = None
+
+            if rule.level in (1, 2):
+                if rule.rule_definition:
+                    rule_def, parse_err = evaluator.parse_yaml(rule.rule_definition)
+                    if parse_err:
+                        error = f"parse error: {parse_err}"
+                    else:
+                        triggered = evaluator.evaluate(rule_def, event_dict)
+
+            elif rule.level == 3:
+                if rule.rule_python:
+                    if _is_sandbox_enabled(org_id):
+                        triggered, error = dsl_runner.execute(rule.rule_python, event_dict)
+                    else:
+                        triggered, error = _execute_unrestricted(
+                            rule.rule_python, event_dict, rule.name
+                        )
+
+            if error:
+                logger.warning(
+                    "Custom rule '%s' (id=%s) error: %s", rule.name, rule.id, error
+                )
+
+            if not triggered:
+                continue
+
+            # ── rule matched ─────────────────────────────────────────────
+            rule.trigger_count  = (rule.trigger_count or 0) + 1
+            rule.last_triggered = datetime.utcnow()
+            db.session.add(rule)
+
+            details_dict = {
+                "rule_id":      rule.id,
+                "rule_name":    rule.name,
+                "rule_level":   rule.level,
+                "ip_address":   log_entry.ip_address,
+                "attack_type":  log_entry.attack_type,
+                "endpoint":     log_entry.endpoint,
+                "mitre_tactic": rule.mitre_tactic,
+                "action":       rule.action,
+            }
+
+            db.session.add(Alert(
+                organisation_id=org_id,
+                message=(
+                    f"Custom rule '{rule.name}' triggered "
+                    f"from {log_entry.ip_address}"
+                ),
+                alert_type=f"custom:{rule.name}",
+                severity=rule.severity or "medium",
+                details=_json.dumps(details_dict),
+            ))
+
+            db.session.add(AttackModel(
+                organisation_id=org_id,
+                attack_type=f"custom:{rule.name}",
+                ip_address=log_entry.ip_address,
+                details=_json.dumps({"rule_id": rule.id, "rule_name": rule.name}),
+                severity=rule.severity or "medium",
+            ))
+
+            if rule.block_ip and log_entry.ip_address:
+                existing = IPBlocklist.query.filter_by(
+                    organisation_id=org_id,
+                    ip_address=log_entry.ip_address,
+                ).first()
+                if not existing:
+                    db.session.add(IPBlocklist(
+                        organisation_id=org_id,
+                        ip_address=log_entry.ip_address,
+                        reason=f"Auto-blocked by custom rule: {rule.name}",
+                        blocked_by="system",
+                    ))
+
+            db.session.commit()
+
+            logger.info(
+                "ALERT [%s]: Custom rule '%s' (id=%s) matched log %s from %s",
+                (rule.severity or "medium").upper(),
+                rule.name, rule.id, log_entry.id, log_entry.ip_address,
+            )
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(
+                "Error evaluating custom rule '%s' (id=%s): %s",
+                rule.name, rule.id, e,
+            )
+            continue
+
+
+# =============================================================================
+# Sandbox helpers
+# =============================================================================
+
+def _is_sandbox_enabled(org_id) -> bool:
+    """
+    Returns True (sandbox ON) by default.
+    Admins can disable in Settings → Security → Python DSL Sandbox.
+    Fails safe: any DB error keeps the sandbox ON.
+    """
+    try:
+        from app.models import OrganisationSettings
+        settings = OrganisationSettings.query.filter_by(
+            organisation_id=org_id
+        ).first()
+        if settings is None:
+            return True
+        return bool(settings.python_dsl_sandbox)
+    except Exception:
+        return True
+
+
+def _execute_unrestricted(rule_code: str, event_dict: dict, rule_name: str):
+    """
+    Execute rule code without RestrictedPython sandbox.
+    Only reached when an admin has explicitly disabled the sandbox.
+    Returns (triggered: bool, error: str | None).
+    """
+    try:
+        exec_globals = {
+            "__builtins__": __builtins__,
+            "re":           __import__("re"),
+            "json":         __import__("json"),
+            "math":         __import__("math"),
+            "hashlib":      __import__("hashlib"),
+            "ipaddress":    __import__("ipaddress"),
+            "collections":  __import__("collections"),
+            "itertools":    __import__("itertools"),
+            "functools":    __import__("functools"),
+            "string":       __import__("string"),
+        }
+        local_vars: dict = {}
+        exec(compile(rule_code, "<rule>", "exec"), exec_globals, local_vars)  # noqa: S102
+        rule_func = local_vars.get("rule")
+        if not callable(rule_func):
+            return False, "Must define a function named 'rule(event)'"
+        result = rule_func(dict(event_dict))
+        return bool(result), None
+    except SyntaxError as e:
+        return False, f"Syntax error: {e}"
+    except Exception as e:
+        return False, f"Runtime error: {e}"

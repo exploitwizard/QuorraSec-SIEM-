@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
+    <script>(function(){var _f=window.fetch;window.fetch=function(u,o){o=o||{};if(o.method&&o.method.toUpperCase()!="GET"){o.headers=o.headers||{};var m=document.querySelector('meta[name="csrf-token"]');if(m&&m.content)o.headers["X-CSRF-Token"]=m.content;}return _f.call(this,u,o);};})();</script>
     <title>Courra-Sec - Attacks</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -94,6 +96,164 @@
         <div class="col-lg-6"><div class="chart-box"><p class="sec-head">Attack Types Distribution</p><canvas id="typeChart" height="200"></canvas></div></div>
         <div class="col-lg-6"><div class="chart-box"><p class="sec-head">Timeline (Last 24h)</p><canvas id="timelineChart" height="200"></canvas></div></div>
     </div>
+
+    <!-- Per-type Attack Charts ════════════════════════════════════════════════ -->
+    <div id="attack-charts-section" class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="mb-0" style="font-size:.9rem;font-weight:600">Attack Overview</h5>
+            <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-secondary active" onclick="loadAttackCharts(1)"  id="chart-btn-1">24h</button>
+                <button class="btn btn-outline-secondary"        onclick="loadAttackCharts(7)"  id="chart-btn-7">7d</button>
+                <button class="btn btn-outline-secondary"        onclick="loadAttackCharts(30)" id="chart-btn-30">30d</button>
+            </div>
+        </div>
+        <div id="attack-chart-rows" class="row g-3">
+            <div class="col-12 text-center text-muted py-4">Loading charts…</div>
+        </div>
+    </div>
+
+    <style>
+    .attack-chart-card{background:linear-gradient(135deg,rgba(99,102,241,.08) 0%,rgba(168,85,247,.06) 100%);border:1px solid rgba(99,102,241,.2);border-radius:12px;overflow:hidden;transition:border-color .2s;}
+    .attack-chart-card:hover{border-color:rgba(99,102,241,.5);}
+    .attack-chart-card .card-body{padding:16px;}
+    .attack-chart-title{font-size:.85rem;font-weight:600;color:#e2e8f0;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .donut-wrap{position:relative;width:120px;height:120px;flex-shrink:0;}
+    .donut-centre{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;}
+    .donut-centre .d-count{font-size:1.6rem;font-weight:700;line-height:1;color:#f8fafc;}
+    .donut-centre .d-label{font-size:.6rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;}
+    .line-wrap{flex:1;min-width:0;height:120px;position:relative;}
+    </style>
+
+    <script>
+    const _CHART_PALETTES=[
+        {donut:['#6366f1','#818cf8','#a5b4fc','#e0e7ff'],line:['rgba(99,102,241,.8)','rgba(99,102,241,.1)']},
+        {donut:['#a855f7','#c084fc','#d8b4fe','#f3e8ff'],line:['rgba(168,85,247,.8)','rgba(168,85,247,.1)']},
+        {donut:['#ec4899','#f472b6','#fbcfe8','#fdf2f8'],line:['rgba(236,72,153,.8)','rgba(236,72,153,.1)']},
+        {donut:['#f59e0b','#fbbf24','#fde68a','#fffbeb'],line:['rgba(245,158,11,.8)','rgba(245,158,11,.1)']},
+        {donut:['#10b981','#34d399','#6ee7b7','#d1fae5'],line:['rgba(16,185,129,.8)','rgba(16,185,129,.1)']},
+        {donut:['#06b6d4','#22d3ee','#67e8f9','#cffafe'],line:['rgba(6,182,212,.8)','rgba(6,182,212,.1)']},
+        {donut:['#ef4444','#f87171','#fca5a5','#fee2e2'],line:['rgba(239,68,68,.8)','rgba(239,68,68,.1)']},
+    ];
+    const _chartInstances={};
+    function _destroyChart(id){if(_chartInstances[id]){_chartInstances[id].destroy();delete _chartInstances[id];}}
+    let _currentChartDays=7;
+
+    function loadAttackCharts(days){
+        _currentChartDays=days||_currentChartDays;
+        [1,7,30].forEach(d=>{
+            const b=document.getElementById(`chart-btn-${d}`);
+            if(b)b.classList.toggle('active',d===_currentChartDays);
+        });
+        const c=document.getElementById('attack-chart-rows');
+        c.innerHTML='<div class="col-12 text-center text-muted py-4">Loading…</div>';
+        fetch(`/api/attacks/chart-data?days=${_currentChartDays}`)
+            .then(r=>r.json())
+            .then(data=>_renderAttackCharts(data))
+            .catch(e=>{
+                console.error('Chart data error:',e);
+                document.getElementById('attack-chart-rows').innerHTML=
+                    '<div class="col-12 text-danger small py-3">Failed to load charts.</div>';
+            });
+    }
+
+    function _renderAttackCharts(data){
+        const container  =document.getElementById('attack-chart-rows');
+        const types      =data.type_counts||[];
+        const timelines  =data.timeline_data||{};
+        const severities =data.severity_data||{};
+
+        if(!types.length){
+            container.innerHTML=`<div class="col-12 text-center text-muted py-4">No attacks in the last ${_currentChartDays} day(s).</div>`;
+            return;
+        }
+
+        container.innerHTML=types.map((item,idx)=>`
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="attack-chart-card">
+                    <div class="card-body">
+                        <div class="attack-chart-title" title="${_escH(item.type)}">${_escH(item.type)}</div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="donut-wrap">
+                                <canvas id="ac_donut_${idx}" width="120" height="120"></canvas>
+                                <div class="donut-centre">
+                                    <div class="d-count">${item.count}</div>
+                                    <div class="d-label">events</div>
+                                </div>
+                            </div>
+                            <div class="line-wrap">
+                                <canvas id="ac_line_${idx}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        requestAnimationFrame(()=>{
+            types.forEach((item,idx)=>{
+                const pal=_CHART_PALETTES[idx%_CHART_PALETTES.length];
+                _renderDonut(idx,item,pal,severities[item.type]||{});
+                _renderLine(idx,item,pal,timelines[item.type]||[]);
+            });
+        });
+    }
+
+    function _renderDonut(idx,item,pal,sevMap){
+        const id=`ac_donut_${idx}`;
+        _destroyChart(id);
+        const canvas=document.getElementById(id);
+        if(!canvas)return;
+        const sevOrder=['critical','high','medium','low','info'];
+        const sevColors={critical:pal.donut[0],high:pal.donut[1],medium:pal.donut[2],low:pal.donut[3],info:'rgba(148,163,184,.4)'};
+        let labels=[],counts=[],colors=[];
+        sevOrder.forEach(s=>{if(sevMap[s]){labels.push(s);counts.push(sevMap[s]);colors.push(sevColors[s]);}});
+        if(!counts.length){labels=[item.type];counts=[item.count];colors=[pal.donut[0]];}
+        _chartInstances[id]=new Chart(canvas,{
+            type:'doughnut',
+            data:{labels,datasets:[{data:counts,backgroundColor:colors,borderColor:colors,borderWidth:2,hoverOffset:4}]},
+            options:{responsive:false,maintainAspectRatio:false,cutout:'65%',
+                plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed}`}}},
+                animation:{animateRotate:true,duration:800}}
+        });
+    }
+
+    function _renderLine(idx,item,pal,timeline){
+        const id=`ac_line_${idx}`;
+        _destroyChart(id);
+        const canvas=document.getElementById(id);
+        if(!canvas)return;
+        const ctx=canvas.getContext('2d');
+        const h=canvas.parentElement?.clientHeight||120;
+        const grad=ctx.createLinearGradient(0,0,0,h);
+        grad.addColorStop(0,pal.line[0]);
+        grad.addColorStop(1,pal.line[1]);
+        let labels=[],values=[];
+        if(timeline.length){
+            timeline.forEach(pt=>{
+                const d=new Date(pt.hour);
+                labels.push(isNaN(d)?pt.hour:d.toLocaleString('en-IN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}));
+                values.push(pt.count);
+            });
+        } else {labels=['No data'];values=[0];}
+        _chartInstances[id]=new Chart(canvas,{
+            type:'line',
+            data:{labels,datasets:[{data:values,fill:true,backgroundColor:grad,borderColor:pal.line[0],borderWidth:2,
+                pointRadius:timeline.length<=24?3:0,pointHoverRadius:5,tension:.4}]},
+            options:{responsive:true,maintainAspectRatio:false,
+                plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>i[0].label,label:ctx=>` ${ctx.parsed.y} events`}}},
+                scales:{x:{display:false,grid:{display:false}},
+                    y:{display:true,beginAtZero:true,grid:{color:'rgba(255,255,255,.05)',drawBorder:false},
+                        ticks:{color:'rgba(255,255,255,.3)',maxTicksLimit:4,font:{size:10}}}},
+                animation:{duration:600}}
+        });
+    }
+
+    function _escH(str){const d=document.createElement('div');d.textContent=str||'';return d.innerHTML;}
+
+    document.addEventListener('DOMContentLoaded',()=>loadAttackCharts(7));
+    if(document.readyState!=='loading')loadAttackCharts(7);
+    </script>
+    <!-- End Per-type Attack Charts ════════════════════════════════════════════ -->
 
     <!-- Filter + list -->
     <div class="g-card mb-3 py-3">
@@ -304,9 +464,6 @@ function goto(p){currentPage=p;renderAttacks();}
 function viewAttack(id) {
     const a = allAttacks.find(x=>x.id===id);
     if (!a) return;
-    const tags = mlTags(a);
-    const sb = a.det.signal_breakdown || (a.det.risk||{}).signal_breakdown || null;
-    const sbHTML = sb ? `<p class="sec-head mt-3">ML Signal Breakdown</p><div class="row g-2">${Object.entries(sb).map(([k,v])=>`<div class="col-6"><div style="font-size:.7rem;color:#9ca3af;text-transform:capitalize">${k}</div><div style="height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden"><div style="height:100%;width:${v}%;background:#a78bfa"></div></div><span style="font-size:.7rem;color:#a78bfa">${v}</span></div>`).join('')}</div>` : '';
 
     document.getElementById('attackModalBody').innerHTML=`
     <div class="row g-3">
@@ -325,19 +482,12 @@ function viewAttack(id) {
         </div>
         <div class="col-md-7">
             <p class="sec-head">ML Intelligence</p>
-            ${a._score!==null ? `
-            <div class="d-flex align-items-center gap-3 mb-3">
-                <div class="risk-ring risk-${rc(a._score)}" style="width:64px;height:64px;font-size:1rem">${a._score}</div>
-                <div>
-                    <div style="font-size:.9rem;font-weight:700;color:${barColor(rc(a._score))}">${rc(a._score).toUpperCase()} RISK</div>
-                    ${a._label?`<div style="font-size:.8rem;color:#a78bfa">${a._label}</div>`:''}
-                    ${a._mitre?`<div style="font-size:.72rem;color:#818cf8">${a._mitre}</div>`:''}
+            <div id="attack-ml-section">
+                <div class="text-secondary small">
+                    <div class="spinner-border spinner-border-sm me-1" style="width:.9rem;height:.9rem"></div>
+                    Loading ML analysis…
                 </div>
-            </div>` : '<p class="text-secondary small">ML models not trained.</p>'}
-            <div class="mb-2">${tags||'<span class="text-secondary small">No ML flags</span>'}</div>
-            ${a._chains.length?`<p class="sec-head mt-2">Attack Chains</p>${a._chains.map(c=>`<div class="mb-1 small">[chain]<strong>${c.pattern_name}</strong> — ${c.pattern?.join(' → ')||''} — risk ${Math.round(c.chain_risk*100)}%</div>`).join('')}`:''}
-            ${(a.det.ueba_anomalies||[]).length?`<p class="sec-head mt-2">UEBA Anomalies</p>${a.det.ueba_anomalies.map(x=>`<div class="small text-warning">[!]${x}</div>`).join('')}`:''}
-            ${sbHTML}
+            </div>
         </div>
     </div>`;
 
@@ -346,6 +496,80 @@ function viewAttack(id) {
         blockIP(a.ip_address);
     };
     new bootstrap.Modal(document.getElementById('attackModal')).show();
+
+    // Fetch ML data from detail endpoint and render
+    fetch(`/api/attacks/${id}`)
+        .then(r => r.json())
+        .then(data => renderAttackML(data.ml || null))
+        .catch(() => renderAttackML(null));
+}
+
+function renderAttackML(ml) {
+    const container = document.getElementById('attack-ml-section');
+    if (!container) return;
+
+    if (!ml || ml.risk_score === undefined || ml.risk_score === null) {
+        container.innerHTML = '<div class="text-muted small">Computing ML analysis…</div>';
+        return;
+    }
+
+    const risk       = parseFloat(ml.risk_score  || 0).toFixed(1);
+    const anomalyPct = (parseFloat(ml.anomaly_score || 0) * 100).toFixed(0);
+    const isAnomaly  = !!ml.is_anomaly;
+    const ueba       = Array.isArray(ml.ueba_flags)    ? ml.ueba_flags    : [];
+    const chains     = Array.isArray(ml.attack_chains) ? ml.attack_chains : [];
+    const status     = ml.status || 'statistical_fallback';
+
+    const stMap = {
+        'trained':              {label:'Trained Model',        cls:'success'},
+        'statistical_fallback': {label:'Statistical Estimate', cls:'warning'},
+        'error':                {label:'Analysis Error',       cls:'danger'},
+        'pending':              {label:'Pending',              cls:'secondary'},
+    };
+    const st      = stMap[status] || {label: status, cls:'secondary'};
+    const riskCls = risk >= 70 ? 'danger' : risk >= 40 ? 'warning' : 'success';
+
+    container.innerHTML = `
+        <div class="card" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="mb-0 text-white" style="font-size:.82rem">ML Analysis</h6>
+                    <span class="badge bg-${st.cls}" style="font-size:.68rem">${st.label}</span>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <div class="p-2 rounded text-center" style="background:rgba(255,255,255,.05)">
+                            <div class="text-muted small mb-1" style="font-size:.7rem">Risk Score</div>
+                            <div class="fw-bold fs-4 text-${riskCls}">${risk}<small class="text-muted fs-6">/100</small></div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded text-center" style="background:rgba(255,255,255,.05)">
+                            <div class="text-muted small mb-1" style="font-size:.7rem">Anomaly Score</div>
+                            <div class="fw-bold fs-4 ${isAnomaly ? 'text-danger' : 'text-success'}">${anomalyPct}<small class="text-muted fs-6">%</small></div>
+                        </div>
+                    </div>
+                </div>
+                ${isAnomaly ? `<div class="alert alert-danger py-1 px-2 mb-2 small">Anomalous behaviour detected by ML</div>` : ''}
+                ${ueba.length > 0
+                    ? `<div class="mb-2"><div class="small text-muted mb-1">UEBA Flags</div><div class="d-flex flex-wrap gap-1">${ueba.map(f=>`<span class="badge bg-warning text-dark" style="font-size:.68rem">${f}</span>`).join('')}</div></div>`
+                    : `<div class="text-muted small mb-2">No UEBA flags detected</div>`}
+                ${chains.length > 0
+                    ? `<div class="mb-1"><div class="small text-muted mb-1">Attack Chains</div><div class="d-flex flex-wrap gap-1">${chains.map(c=>`<span class="badge bg-danger" style="font-size:.68rem">${c}</span>`).join('')}</div></div>`
+                    : ''}
+                ${ml.components && Object.keys(ml.components).length
+                    ? `<div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,.07)">
+                        <div class="small text-muted mb-1">Signal Breakdown</div>
+                        <div class="row g-1">${Object.entries(ml.components).filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`
+                            <div class="col-4 text-center">
+                                <div class="text-muted" style="font-size:.63rem">${k.replace(/_/g,' ')}</div>
+                                <div class="fw-bold text-info" style="font-size:.78rem">${parseFloat(v).toFixed(1)}</div>
+                            </div>`).join('')}
+                        </div>
+                       </div>`
+                    : ''}
+            </div>
+        </div>`;
 }
 
 async function blockIP(ip) {
@@ -384,6 +608,7 @@ async function lookupGeo(ip) {
             ${data.org      ? `<tr><td class="text-secondary">Org</td><td>${data.org}</td></tr>` : ''}
             ${data.timezone ? `<tr><td class="text-secondary">Timezone</td><td>${data.timezone}</td></tr>` : ''}
             <tr><td class="text-secondary">Source</td><td><span style="font-size:.72rem;color:#6b7280">${data.source}</span></td></tr>
+            ${data.note     ? `<tr><td class="text-secondary" style="vertical-align:top">Note</td><td style="font-size:.78rem;color:#9ca3af">${data.note}</td></tr>` : ''}
         </table>`;
     } catch(e) {
         body.innerHTML = `<div class="text-danger text-center py-3">Lookup failed: ${e.message}</div>`;

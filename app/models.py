@@ -141,18 +141,32 @@ class LogEntry(db.Model):
     raw_data        = db.Column(db.Text)
     suppressed      = db.Column(db.Boolean, default=False)
 
+    # ML Analysis Results — populated by background ML pipeline after ingest
+    ml_risk_score    = db.Column(db.Float,    nullable=True)
+    ml_anomaly_score = db.Column(db.Float,    nullable=True)
+    ml_is_anomaly    = db.Column(db.Boolean,  nullable=True)
+    ml_ueba_flags    = db.Column(db.Text,     nullable=True)  # JSON list
+    ml_attack_chains = db.Column(db.Text,     nullable=True)  # JSON list
+    ml_analysis      = db.Column(db.Text,     nullable=True)  # full JSON
+    ml_analyzed_at   = db.Column(db.DateTime, nullable=True)
+    ml_model_version = db.Column(db.String(20), nullable=True)
+
     def to_dict(self) -> dict:
         return {
-            "id":          self.id,
-            "ip_address":  self.ip_address,
-            "attack_type": self.attack_type,
-            "endpoint":    self.endpoint,
-            "payload":     self.payload,
-            "user_agent":  self.user_agent,
-            "severity":    self.severity,
-            "timestamp":   self.timestamp.isoformat() if self.timestamp else None,
-            "raw_data":    self.raw_data,
-            "suppressed":  self.suppressed,
+            "id":              self.id,
+            "ip_address":      self.ip_address,
+            "attack_type":     self.attack_type,
+            "endpoint":        self.endpoint,
+            "payload":         self.payload,
+            "user_agent":      self.user_agent,
+            "severity":        self.severity,
+            "timestamp":       self.timestamp.isoformat() if self.timestamp else None,
+            "raw_data":        self.raw_data,
+            "suppressed":      self.suppressed,
+            "ml_risk_score":   self.ml_risk_score,
+            "ml_anomaly_score":self.ml_anomaly_score,
+            "ml_is_anomaly":   self.ml_is_anomaly,
+            "ml_analyzed_at":  self.ml_analyzed_at.isoformat() if self.ml_analyzed_at else None,
         }
 
 
@@ -517,6 +531,38 @@ class SuppressionRule(db.Model):
 
 
 # =====================================================
+# Organisation Settings (per-tenant security config)
+# =====================================================
+class OrganisationSettings(db.Model):
+    __tablename__ = 'organisation_settings'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    organisation_id = db.Column(
+        db.Integer,
+        db.ForeignKey('organisations.id'),
+        unique=True,
+        nullable=False,
+    )
+
+    # Python DSL sandbox toggle.
+    # True  = sandbox ON  (default, RestrictedPython — secure)
+    # False = sandbox OFF (plain exec — full Python, admin only)
+    python_dsl_sandbox    = db.Column(db.Boolean, default=True)
+
+    # Audit trail for sandbox changes
+    sandbox_changed_by    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    sandbox_changed_at    = db.Column(db.DateTime, nullable=True)
+
+    max_rule_execution_ms = db.Column(db.Integer, default=500)
+
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+
+# =====================================================
 # Audit Log
 # =====================================================
 class AuditLog(db.Model):
@@ -707,3 +753,31 @@ class OrgIPAllowlist(db.Model):
             'created_by':  self.created_by,
             'created_at':  self.created_at.isoformat() if self.created_at else None,
         }
+
+
+# =====================================================
+# Default Rule Override (admin enable/disable/annotate
+# the 5 built-in detection rules per organisation)
+# =====================================================
+class DefaultRuleOverride(db.Model):
+    __tablename__ = 'default_rule_overrides'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    organisation_id = db.Column(db.Integer,
+                        db.ForeignKey('organisations.id'),
+                        nullable=False)
+    rule_id         = db.Column(db.String(80), nullable=False)
+    is_active       = db.Column(db.Boolean, default=True)
+    notes           = db.Column(db.Text, nullable=True)
+    edited_at       = db.Column(db.DateTime,
+                        default=datetime.utcnow)
+    edited_by       = db.Column(db.Integer,
+                        db.ForeignKey('users.id'),
+                        nullable=True)
+    edited_by_name  = db.Column(db.String(80), nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('organisation_id', 'rule_id',
+                            name='uq_default_rule_override_org_rule'),
+        db.Index('idx_default_rule_overrides_org', 'organisation_id'),
+    )

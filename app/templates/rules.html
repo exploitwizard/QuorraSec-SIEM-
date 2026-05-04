@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ session.get('csrf_token', '') }}">
+    <script>(function(){var _f=window.fetch;window.fetch=function(u,o){o=o||{};if(o.method&&o.method.toUpperCase()!="GET"){o.headers=o.headers||{};var m=document.querySelector('meta[name="csrf-token"]');if(m&&m.content)o.headers["X-CSRF-Token"]=m.content;}return _f.call(this,u,o);};})();</script>
     <title>Courra-Sec - Rule Builder</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -102,6 +104,27 @@
     <div class="row g-3">
         <!-- Left: Rules List -->
         <div class="col-12 col-xl-8">
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- DEFAULT RULES SECTION                                   -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <div class="g-card mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="mb-0" style="font-size:.95rem">
+                        Default Detection Rules
+                        <span class="badge ms-2" id="default-rules-count"
+                              style="background:rgba(99,102,241,.15);color:#a78bfa;font-size:.68rem">5</span>
+                    </h5>
+                    <small class="text-muted" style="font-size:.72rem">Built-in rules — always active unless disabled by admin</small>
+                </div>
+                <div id="default-rules-container">
+                    <div class="text-muted small p-2">Loading default rules…</div>
+                </div>
+            </div>
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- END DEFAULT RULES SECTION                               -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
             <div class="g-card p-0" style="overflow:hidden">
                 <div class="px-4 pt-4 pb-2 d-flex justify-content-between align-items-center">
                     <span class="sec-head mb-0">Active Rules</span>
@@ -718,6 +741,94 @@ function esc(s) {
     if (s == null) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Default Rules ─────────────────────────────────────────────────────────────
+const _SEVERITY_COLOR = {critical:'danger',high:'warning',medium:'info',low:'secondary'};
+const _MITRE_LABELS = {
+    'TA0001':'Initial Access','TA0002':'Execution',
+    'TA0004':'Privilege Escalation','TA0006':'Credential Access',
+    'TA0043':'Reconnaissance',
+};
+
+function loadDefaultRules() {
+    fetch('/api/rules/default')
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('default-rules-container');
+            const rules     = data.default_rules || [];
+
+            if (!rules.length) {
+                container.innerHTML = '<div class="text-muted small p-2">No default rules found.</div>';
+                return;
+            }
+
+            document.getElementById('default-rules-count').textContent = rules.length;
+
+            container.innerHTML = rules.map(rule => `
+                <div class="mb-2" style="border:1px solid ${rule.is_edited ? 'rgba(245,158,11,.4)' : 'rgba(99,102,241,.2)'};border-left:3px solid ${rule.is_edited ? '#f59e0b' : '#6366f1'};border-radius:8px;padding:10px 14px;background:rgba(255,255,255,.02);${!rule.is_active ? 'opacity:.5' : ''}">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center flex-wrap gap-1 mb-1">
+                                ${rule.is_edited ? `<span class="badge bg-warning text-dark" style="font-size:.63rem;font-weight:700">EDITED</span>` : ''}
+                                <span class="badge bg-primary" style="font-size:.63rem">DEFAULT</span>
+                                <span class="fw-semibold" style="font-size:.84rem">${esc(rule.name)}</span>
+                                <span class="badge bg-${_SEVERITY_COLOR[rule.severity]||'secondary'}" style="font-size:.63rem">${(rule.severity||'').toUpperCase()}</span>
+                                ${!rule.is_active ? `<span class="badge bg-secondary" style="font-size:.63rem">DISABLED</span>` : ''}
+                            </div>
+                            <div class="text-muted small mb-1">${esc(rule.description)}</div>
+                            <div class="d-flex gap-3 small">
+                                <span class="text-muted">MITRE: <span class="text-info">${_MITRE_LABELS[rule.mitre_tactic]||rule.mitre_tactic||'N/A'}</span></span>
+                                <span class="text-muted">Triggers: <span class="text-warning fw-bold">${rule.trigger_count||0}</span></span>
+                                <span class="text-muted">Action: <span class="text-success">${(rule.action||'alert').replace(/_/g,' ')}</span></span>
+                                ${rule.is_edited ? `<span class="text-muted">Edited by: <span class="text-warning">${esc(rule.edited_by_name||'admin')}</span></span>` : ''}
+                            </div>
+                        </div>
+                        <div class="ms-3 d-flex align-items-center">
+                            <div class="form-check form-switch mb-0" title="${rule.is_active ? 'Click to disable' : 'Click to enable'}">
+                                <input class="form-check-input" type="checkbox" id="dtoggle_${rule.id}"
+                                    ${rule.is_active ? 'checked' : ''}
+                                    onchange="toggleDefaultRule('${rule.id}', this.checked)"
+                                    style="cursor:pointer">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(e => {
+            console.error('Failed to load default rules:', e);
+            document.getElementById('default-rules-container').innerHTML =
+                '<div class="text-danger small p-2">Failed to load default rules.</div>';
+        });
+}
+
+function toggleDefaultRule(ruleId, isActive) {
+    fetch(`/api/rules/default/${ruleId}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_active: isActive})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            const chk = document.getElementById(`dtoggle_${ruleId}`);
+            if (chk) chk.checked = !isActive;
+            return;
+        }
+        loadDefaultRules();
+    })
+    .catch(e => {
+        console.error('Toggle error:', e);
+        const chk = document.getElementById(`dtoggle_${ruleId}`);
+        if (chk) chk.checked = !isActive;
+    });
+}
+
+// Load default rules after schema + custom rules are loaded
+document.addEventListener('DOMContentLoaded', () => {
+    loadDefaultRules();
+});
 </script>
 </body>
 </html>
