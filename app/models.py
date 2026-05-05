@@ -1,3 +1,21 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEVELOPER RULE — ADDING NEW COLUMNS
+# ═══════════════════════════════════════════════════════════════════════════════
+# When you add a new db.Column() to ANY model in this file:
+#
+# 1. Add the column to the model class (you already did this)
+#
+# 2. ALSO add it to REQUIRED_COLUMNS in app/migrate.py
+#    Format: ("table_name", "column_name", "SQLITE_TYPE", default)
+#    Example: ("organisations", "my_new_col", "TEXT", None)
+#
+# 3. NEVER rely on db.create_all() to add columns to existing tables —
+#    it only creates NEW tables, never alters existing ones.
+#
+# 4. The migration runs automatically at startup via init_db() so existing
+#    deployments get the column on next restart.
+# ═══════════════════════════════════════════════════════════════════════════════
+
 from app.database import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,7 +30,7 @@ class Organisation(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     name           = db.Column(db.String(120), nullable=False)
     slug           = db.Column(db.String(60), unique=True, nullable=False)
-    plan           = db.Column(db.String(20), default='free')    # free / pro
+    plan           = db.Column(db.String(20), default='open')   # open (no restrictions)
     status         = db.Column(db.String(20), default='active')  # active / suspended
 
     # SDK credentials
@@ -22,10 +40,20 @@ class Organisation(db.Model):
     # Contact
     owner_email    = db.Column(db.String(120), nullable=False)
 
-    # Limits (free tier)
-    max_users         = db.Column(db.Integer, default=5)
-    max_logs_per_day  = db.Column(db.Integer, default=10000)
-    max_rules         = db.Column(db.Integer, default=10)
+    # Connected application info
+    app_name       = db.Column(db.String(120), nullable=True)
+    app_url        = db.Column(db.String(255), nullable=True)
+    app_type       = db.Column(db.String(50),  nullable=True)
+
+    # Seat limits — 20 total, owner allocates by role
+    max_users         = db.Column(db.Integer, default=20)
+    max_admins        = db.Column(db.Integer, default=5)
+    max_analysts      = db.Column(db.Integer, default=10)
+    max_readonly      = db.Column(db.Integer, default=4)
+
+    # No log or rule limits — open source
+    max_logs_per_day  = db.Column(db.Integer, default=9999999)
+    max_rules         = db.Column(db.Integer, default=9999)
 
     # Timestamps
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)

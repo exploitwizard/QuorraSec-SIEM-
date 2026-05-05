@@ -91,11 +91,31 @@
         <div class="col-6 col-md-3"><div class="g-card text-center"><div class="stat-num" style="color:#a78bfa" id="chainCount">—</div><div class="stat-lbl">Attack Chains</div></div></div>
     </div>
 
-    <!-- Charts -->
-    <div class="row g-3 mb-3">
-        <div class="col-lg-6"><div class="chart-box"><p class="sec-head">Attack Types Distribution</p><canvas id="typeChart" height="200"></canvas></div></div>
-        <div class="col-lg-6"><div class="chart-box"><p class="sec-head">Timeline (Last 24h)</p><canvas id="timelineChart" height="200"></canvas></div></div>
+    <!-- ── ATTACK TYPES DISTRIBUTION (compact) -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:500;letter-spacing:.08em;color:rgba(255,255,255,0.4);text-transform:uppercase">Attack Types Distribution</span>
+      </div>
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:center;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px">
+        <!-- LEFT: compact donut -->
+        <div style="position:relative;height:220px">
+          <canvas id="attackDistChart"></canvas>
+          <div id="dist-centre" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+            <div style="font-size:24px;font-weight:700;color:#fff;line-height:1" id="dist-total">0</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.06em">total</div>
+          </div>
+        </div>
+        <!-- RIGHT: timeline bar -->
+        <div>
+          <div style="font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:8px">Timeline (Last 24h)</div>
+          <div style="position:relative;height:180px">
+            <canvas id="timelineChart"></canvas>
+          </div>
+          <div id="dist-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
+        </div>
+      </div>
     </div>
+    <!-- ── END ATTACK TYPES DISTRIBUTION -->
 
     <!-- Per-type Attack Charts ════════════════════════════════════════════════ -->
     <div id="attack-charts-section" class="mb-4">
@@ -323,7 +343,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let allAttacks=[], filteredAttacks=[], typeChart, timelineChart;
+let allAttacks=[], filteredAttacks=[], attackDistChart, timelineChart;
 let currentPage=1; const PER=10;
 
 function rc(s){return s>=80?'critical':s>=60?'high':s>=40?'medium':s>=20?'low':'info';}
@@ -363,10 +383,22 @@ async function loadAttackData() {
             };
         });
 
-        const chainTotal = allAttacks.reduce((n,a)=>n+(a._chains.length?1:0),0);
+        // Use severity-derived score as fallback when ML score is unavailable
+        const SEV_SCORE = {critical:85, high:65, medium:40, low:20};
+        const CHAIN_TYPES = ['Multi-Attack Burst','multi_attack','attack_chain','Reconnaissance','Credential Theft'];
+        const critML = allAttacks.filter(a => {
+            const s = (a._score !== null && a._score !== undefined)
+                ? a._score
+                : (SEV_SCORE[a.severity] || 30);
+            return s >= 80;
+        }).length;
+        const chainTotal = allAttacks.filter(a =>
+            a._chains.length > 0 ||
+            CHAIN_TYPES.some(t => a.attack_type === t)
+        ).length;
         document.getElementById('totalAttacks').textContent = allAttacks.length;
         document.getElementById('todayAttacks').textContent = allAttacks.filter(a=>new Date(a.detected_at).toDateString()===today).length;
-        document.getElementById('critAttacks').textContent  = allAttacks.filter(a=>a._score>=80).length;
+        document.getElementById('critAttacks').textContent  = critML;
         document.getElementById('chainCount').textContent   = chainTotal;
 
         buildCharts(stats);
@@ -376,16 +408,105 @@ async function loadAttackData() {
     }
 }
 
-function buildCharts(stats) {
-    const types = stats.attack_types||{};
-    const tCtx  = document.getElementById('typeChart').getContext('2d');
-    if(typeChart)typeChart.destroy();
-    typeChart = new Chart(tCtx,{type:'doughnut',data:{labels:Object.keys(types),datasets:[{data:Object.values(types),backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#6b7280','#a78bfa','#06b6d4'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#9ca3af',font:{size:11}}}}}});
+// Purple/indigo palette matching Attack Overview cards
+const DIST_PALETTE = [
+    '#6366f1','#a855f7','#ec4899','#f59e0b',
+    '#10b981','#06b6d4','#ef4444','#8b5cf6',
+];
 
-    const hourly = stats.hourly_distribution||{};
-    const tlCtx  = document.getElementById('timelineChart').getContext('2d');
-    if(timelineChart)timelineChart.destroy();
-    timelineChart = new Chart(tlCtx,{type:'bar',data:{labels:Object.keys(hourly),datasets:[{label:'Attacks',data:Object.values(hourly),backgroundColor:'rgba(239,68,68,.5)',borderColor:'#ef4444',borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6b7280'}},x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6b7280'}}}}});
+function initDistributionChart(typeObj) {
+    const ctx = document.getElementById('attackDistChart');
+    if (!ctx) return;
+    if (attackDistChart) { attackDistChart.destroy(); attackDistChart = null; }
+
+    const labels = Object.keys(typeObj);
+    const counts = Object.values(typeObj);
+    const total  = counts.reduce((a,b) => a + b, 0);
+
+    const el = document.getElementById('dist-total');
+    if (el) el.textContent = total;
+
+    const leg = document.getElementById('dist-legend');
+    if (leg) {
+        leg.innerHTML = labels.map((l,i) =>
+            `<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,0.55)">
+                <span style="width:8px;height:8px;border-radius:2px;background:${DIST_PALETTE[i%DIST_PALETTE.length]};flex-shrink:0"></span>
+                ${l}
+            </span>`
+        ).join('');
+    }
+
+    attackDistChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data:            counts,
+                backgroundColor: labels.map((_,i) => DIST_PALETTE[i % DIST_PALETTE.length]),
+                borderColor:     labels.map((_,i) => DIST_PALETTE[i % DIST_PALETTE.length]),
+                borderWidth: 2,
+                hoverOffset: 6,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '68%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx =>
+                    ` ${ctx.label}: ${ctx.parsed} (${total ? Math.round(ctx.parsed/total*100) : 0}%)`
+                }}
+            },
+            animation: { duration: 600 }
+        }
+    });
+}
+
+function initTimelineChart(hourlyObj) {
+    const ctx = document.getElementById('timelineChart');
+    if (!ctx) return;
+    if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+
+    const labels = Object.keys(hourlyObj);
+    const values = Object.values(hourlyObj);
+
+    timelineChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Attacks',
+                data:  values,
+                backgroundColor:      'rgba(99,102,241,0.75)',
+                hoverBackgroundColor: 'rgba(99,102,241,1)',
+                borderRadius:  4,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false },
+                tooltip: { callbacks: {
+                    title: items => items[0].label,
+                    label: ctx   => ` Attacks: ${ctx.parsed.y}`
+                }}
+            },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                     ticks: { color: 'rgba(255,255,255,0.35)', font: { size: 10 },
+                              maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
+                y: { beginAtZero: true,
+                     grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                     ticks: { color: 'rgba(255,255,255,0.35)', font: { size: 10 },
+                              maxTicksLimit: 5, precision: 0 } }
+            },
+            animation: { duration: 500 }
+        }
+    });
+}
+
+function buildCharts(stats) {
+    initDistributionChart(stats.attack_types || {});
+    initTimelineChart(stats.hourly_distribution || {});
 }
 
 function applyFilters() {

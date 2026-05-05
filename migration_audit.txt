@@ -1,0 +1,59 @@
+=== MIGRATION AUDIT — Courra-Sec SIEM ===
+Date: 2026-05-05
+
+ACTIVE DATABASE: data/courra-sec.db
+
+--- organisations TABLE ---
+Present:   id, name, slug, plan, status, api_key, api_key_prefix, owner_email,
+           max_users, max_logs_per_day, max_rules, created_at, last_active
+MISSING:   app_name, app_url, app_type, max_admins, max_analysts, max_readonly
+
+--- alert TABLE ---
+Present:   id, organisation_id, message, alert_type, severity, details,
+           created_at, acknowledged, is_read
+MISSING:   ml_risk_score, ml_anomaly_score, ml_is_anomaly, ml_ueba_flags,
+           ml_analysis, acknowledged_by, acknowledged_at
+
+--- log_entry TABLE ---
+Present:   ALL columns including all ml_* fields
+MISSING:   (none — already complete)
+
+--- attack TABLE ---
+Present:   id, organisation_id, attack_type, ip_address, details, severity, detected_at
+MISSING:   ml_risk_score, ml_attack_chains, log_id
+
+--- custom_rule TABLE ---
+Present:   id, organisation_id, name, description, level, rule_definition,
+           rule_python, enabled, severity, mitre_tactic, action, block_ip,
+           created_by, created_at, updated_at, trigger_count, last_triggered
+MISSING:   rule_type, conditions, rule_code, mitre_technique, is_tested
+
+--- organisation_settings TABLE ---
+Present:   ALL columns (python_dsl_sandbox, sandbox_changed_by, sandbox_changed_at,
+           max_rule_execution_ms, updated_at)
+MISSING:   (none)
+
+--- default_rule_overrides TABLE ---
+Present:   ALL columns (is_active, notes, edited_at, edited_by, edited_by_name)
+MISSING:   (none)
+
+--- users TABLE ---
+Present:   ALL columns including is_active, must_change_password, totp_secret,
+           totp_enabled, last_login, full_name
+MISSING:   last_login_ip (not in model either — will add to DB only for future use)
+
+CRASH ROOT CAUSE:
+  app/database.py:67 — Organisation.query.filter_by(slug='default').first()
+  runs BEFORE any migration, causing OperationalError on missing columns.
+
+FIX:
+  1. Create app/migrate.py with REQUIRED_COLUMNS registry
+  2. Call run_migrations(app) in init_db() BEFORE db.create_all() and any model queries
+  3. Safety-net call in app/main.py before init_db(app)
+  4. Early-boot call in courra_sec.py before 'from app.main import app'
+
+NOTE: Table name corrections applied vs instructions:
+  log_entries → log_entry
+  alerts      → alert
+  attacks     → attack
+  custom_rules → custom_rule

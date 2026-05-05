@@ -78,6 +78,15 @@ except ImportError:
 # =============================================================================
 # Database
 # =============================================================================
+# Safety-net: run column migrations before init_db() creates the app context
+# and fires any model queries. init_db() also calls run_migrations internally,
+# but this outer call handles the case where database.py is patched differently.
+try:
+    from app.migrate import run_migrations as _run_migrations
+    _run_migrations(app)
+except Exception as _mig_err:
+    logger.warning("Startup migration warning: %s", _mig_err)
+
 with app.app_context():
     init_db(app)
 
@@ -386,6 +395,7 @@ def register():
 
     # Collect fields
     org_name  = request.form.get("org_name",  "").strip()
+    app_name  = request.form.get("app_name",  "").strip()   # optional
     full_name = request.form.get("full_name", "").strip()
     email     = request.form.get("email",     "").strip().lower()
     username  = request.form.get("username",  "").strip().lower()
@@ -424,7 +434,8 @@ def register():
         api_key=api_key,
         api_key_prefix='qrr_live_',
         owner_email=email,
-        plan='free',
+        app_name=app_name[:120] if app_name else None,
+        plan='open',
         status='active',
     )
     db.session.add(org)
@@ -900,11 +911,6 @@ def update_sandbox_setting():
 @require_auth
 @require_role('owner', 'admin')
 def api_team_invite():
-    from app.limits import check_limit
-    allowed, msg = check_limit(g.org, 'max_users')
-    if not allowed:
-        return jsonify({"ok": False, "error": msg}), 429
-
     data      = request.get_json(force=True, silent=True) or {}
     full_name = (data.get("full_name") or "").strip()
     username  = (data.get("username")  or "").strip().lower()
@@ -916,6 +922,37 @@ def api_team_invite():
         return jsonify({"ok": False, "error": "username and email are required"}), 400
     if role not in ('admin', 'analyst', 'readonly'):
         return jsonify({"ok": False, "error": "invalid role"}), 400
+
+    # Check total seat limit (20 seats)
+    total_active = CourraSecUser.query.filter_by(
+        organisation_id=g.org.id, is_active=True
+    ).count()
+    max_seats = g.org.max_users or 20
+    if total_active >= max_seats:
+        return jsonify({
+            "ok": False,
+            "error": f"Seat limit reached ({max_seats} seats). Deactivate a member to free up a seat.",
+        }), 400
+
+    # Check role-specific quota (owner-configurable)
+    role_limits = {
+        'admin':    g.org.max_admins   or 5,
+        'analyst':  g.org.max_analysts or 10,
+        'readonly': g.org.max_readonly or 4,
+    }
+    if role in role_limits:
+        role_count = CourraSecUser.query.filter_by(
+            organisation_id=g.org.id, role=role, is_active=True
+        ).count()
+        if role_count >= role_limits[role]:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    f"Role slot limit reached for '{role}' "
+                    f"({role_count}/{role_limits[role]}). "
+                    f"Owner can increase the quota in Settings → Team."
+                ),
+            }), 400
 
     if CourraSecUser.query.filter_by(organisation_id=g.org.id, username=username).first():
         return jsonify({"ok": False, "error": f"Username '{username}' already exists"}), 400
@@ -1197,7 +1234,7 @@ def api_stats():
         "active_monitoring":   monitoring_active,
         "ml_available":        ml_pipeline is not None,
         "logs_today":          usage.log_count if usage else 0,
-        "logs_limit":          g.org.max_logs_per_day,
+        "app_name":            g.org.app_name or '',
     })
 
 
@@ -1929,6 +1966,221 @@ def api_ml_summary():
     return jsonify(pipeline.get_ml_summary())
 
 
+@app.route("/api/dashboard/top-risky-entities")
+@require_auth
+def api_top_risky_entities():
+    """Top risky entities from stored ML risk scores — works without trained models."""
+    try:
+        import json as _json
+        from datetime import timedelta
+        since = datetime.utcnow() - timedelta(days=7)
+
+        rows = (
+            db.session.query(
+                LogEntry.ip_address,
+                db.func.max(LogEntry.ml_risk_score).label('max_risk'),
+                db.func.avg(LogEntry.ml_risk_score).label('avg_risk'),
+                db.func.count(LogEntry.id).label('event_count'),
+            )
+            .filter(
+                LogEntry.organisation_id == g.org.id,
+                LogEntry.ip_address.isnot(None),
+                LogEntry.ip_address != '',
+                LogEntry.ip_address != 'client',
+                LogEntry.ml_risk_score.isnot(None),
+                LogEntry.timestamp >= since,
+            )
+            .group_by(LogEntry.ip_address)
+            .order_by(db.func.max(LogEntry.ml_risk_score).desc())
+            .limit(5)
+            .all()
+        )
+
+        entities = []
+        for row in rows:
+            # Grab UEBA flags from highest-risk log for this IP
+            top_log = (
+                LogEntry.query
+                .filter(
+                    LogEntry.organisation_id == g.org.id,
+                    LogEntry.ip_address == row.ip_address,
+                    LogEntry.ml_ueba_flags.isnot(None),
+                )
+                .order_by(LogEntry.ml_risk_score.desc())
+                .first()
+            )
+            ueba_flags = []
+            if top_log and top_log.ml_ueba_flags:
+                try:
+                    ueba_flags = _json.loads(top_log.ml_ueba_flags)
+                except Exception:
+                    pass
+
+            attack_count = Attack.query.filter(
+                Attack.organisation_id == g.org.id,
+                Attack.ip_address == row.ip_address,
+            ).count()
+
+            risk = round(float(row.max_risk or 0), 1)
+            entities.append({
+                'ip':           row.ip_address,
+                'max_risk':     risk,
+                'avg_risk':     round(float(row.avg_risk or 0), 1),
+                'event_count':  row.event_count,
+                'attack_count': attack_count,
+                'ueba_flags':   ueba_flags,
+                'risk_level':   (
+                    'critical' if risk >= 70 else
+                    'high'     if risk >= 50 else
+                    'medium'   if risk >= 30 else 'low'
+                ),
+            })
+
+        # Fallback: use attacks table when no ML-scored logs exist
+        if not entities:
+            attack_rows = (
+                db.session.query(
+                    Attack.ip_address,
+                    db.func.count(Attack.id).label('cnt'),
+                )
+                .filter(
+                    Attack.organisation_id == g.org.id,
+                    Attack.ip_address.isnot(None),
+                    Attack.ip_address != '',
+                    Attack.ip_address != 'client',
+                )
+                .group_by(Attack.ip_address)
+                .order_by(db.func.count(Attack.id).desc())
+                .limit(5)
+                .all()
+            )
+            for row in attack_rows:
+                entities.append({
+                    'ip':           row.ip_address,
+                    'max_risk':     65.0,
+                    'avg_risk':     50.0,
+                    'event_count':  row.cnt,
+                    'attack_count': row.cnt,
+                    'ueba_flags':   ['repeated_attacks'],
+                    'risk_level':   'high',
+                })
+
+        return jsonify({'entities': entities, 'total': len(entities)}), 200
+
+    except Exception as e:
+        app.logger.error("top-risky-entities error: %s", e)
+        return jsonify({'entities': [], 'total': 0}), 500
+
+
+@app.route("/api/org/app-info", methods=["GET", "POST"])
+@require_auth
+def api_org_app_info():
+    """Get or update the connected application info for this organisation."""
+    if request.method == "GET":
+        return jsonify({
+            'app_name': g.org.app_name or '',
+            'app_url':  g.org.app_url  or '',
+            'app_type': g.org.app_type or '',
+        }), 200
+
+    if g.user.role not in ('owner', 'admin'):
+        return jsonify({'error': 'Admin access required'}), 403
+
+    data = request.get_json(silent=True) or {}
+    if 'app_name' in data:
+        g.org.app_name = str(data['app_name'])[:120]
+    if 'app_url' in data:
+        g.org.app_url  = str(data['app_url'])[:255]
+    if 'app_type' in data:
+        g.org.app_type = str(data['app_type'])[:50]
+    db.session.commit()
+    return jsonify({'message': 'App info updated'}), 200
+
+
+@app.route("/api/org/role-quotas", methods=["GET"])
+@require_auth
+def api_get_role_quotas():
+    """Return current role quota configuration and usage counts."""
+    role_counts = dict(
+        db.session.query(
+            CourraSecUser.role,
+            db.func.count(CourraSecUser.id),
+        )
+        .filter_by(organisation_id=g.org.id, is_active=True)
+        .group_by(CourraSecUser.role)
+        .all()
+    )
+    total_used   = sum(role_counts.values())
+    max_users    = g.org.max_users    or 20
+    max_admins   = g.org.max_admins   or 5
+    max_analysts = g.org.max_analysts or 10
+    max_readonly = g.org.max_readonly or 4
+
+    return jsonify({
+        'max_users':  max_users,
+        'total_used': total_used,
+        'seats_left': max(0, max_users - total_used),
+        'quotas': {
+            'owner':    {'max': 1,            'used': role_counts.get('owner',    0)},
+            'admin':    {'max': max_admins,   'used': role_counts.get('admin',    0)},
+            'analyst':  {'max': max_analysts, 'used': role_counts.get('analyst',  0)},
+            'readonly': {'max': max_readonly, 'used': role_counts.get('readonly', 0)},
+        },
+    }), 200
+
+
+@app.route("/api/org/role-quotas", methods=["POST"])
+@require_auth
+def api_set_role_quotas():
+    """Owner sets how many of each role are allowed (max total 19, leaving 1 for owner)."""
+    if g.user.role != 'owner':
+        return jsonify({'error': 'Only the owner can set role quotas'}), 403
+
+    data         = request.get_json(silent=True) or {}
+    max_admins   = int(data.get('max_admins',   g.org.max_admins   or 5))
+    max_analysts = int(data.get('max_analysts', g.org.max_analysts or 10))
+    max_readonly = int(data.get('max_readonly', g.org.max_readonly or 4))
+
+    total = max_admins + max_analysts + max_readonly
+    if total > 19:
+        return jsonify({
+            'error': f'Total role slots ({total}) cannot exceed 19 (20 seats minus 1 for owner).'
+        }), 400
+
+    # Cannot reduce below current active count for each role
+    role_counts = dict(
+        db.session.query(
+            CourraSecUser.role, db.func.count(CourraSecUser.id)
+        )
+        .filter_by(organisation_id=g.org.id, is_active=True)
+        .group_by(CourraSecUser.role).all()
+    )
+    for role_name, new_max, field in [
+        ('admin',    max_admins,   'admin'),
+        ('analyst',  max_analysts, 'analyst'),
+        ('readonly', max_readonly, 'readonly'),
+    ]:
+        current = role_counts.get(role_name, 0)
+        if new_max < current:
+            return jsonify({
+                'error': (
+                    f"Cannot reduce {role_name} slots below current "
+                    f"count ({current})."
+                )
+            }), 400
+
+    g.org.max_admins   = max_admins
+    g.org.max_analysts = max_analysts
+    g.org.max_readonly = max_readonly
+    db.session.commit()
+    return jsonify({
+        'message':       'Role quotas updated',
+        'max_admins':    max_admins,
+        'max_analysts':  max_analysts,
+        'max_readonly':  max_readonly,
+    }), 200
+
+
 @app.route("/api/ml/entity/<entity_id>")
 @require_auth
 def api_ml_entity(entity_id):
@@ -1953,10 +2205,8 @@ def _lookup_org_by_api_key(api_key: str):
 
 
 def _check_daily_limit(org) -> bool:
-    """Return True if org is within its daily log limit, False if over."""
-    today = datetime.utcnow().date()
-    usage = ApiKeyUsage.query.filter_by(organisation_id=org.id, date=today).first()
-    return not (usage and usage.log_count >= org.max_logs_per_day)
+    """Always return True — no log limits in open-source build."""
+    return True
 
 
 def _increment_usage(org):

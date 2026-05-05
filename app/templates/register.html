@@ -118,8 +118,8 @@
         <div class="lf-item"><i class="fas fa-check-circle"></i> WebSocket real-time ingestion</div>
         <div class="lf-item"><i class="fas fa-check-circle"></i> Slack, Teams &amp; webhook alerts</div>
         <div class="lf-item"><i class="fas fa-check-circle"></i> GeoIP threat mapping</div>
-        <div class="lf-item"><i class="fas fa-check-circle"></i> Up to 5 team members, free</div>
-        <div class="lf-item"><i class="fas fa-check-circle"></i> 10,000 logs per day, free</div>
+        <div class="lf-item"><i class="fas fa-check-circle"></i> Up to 20 team members</div>
+        <div class="lf-item"><i class="fas fa-check-circle"></i> Unlimited log ingestion</div>
     </div>
 </div>
 
@@ -141,6 +141,21 @@
                        value="{{ form.org_name if form else '' }}">
                 <div class="slug-preview">
                     Your dashboard: <span class="slug-val" id="slugPreview">courra-sec.yourdomain.com/org/<em>slug</em></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Your Web Application <span style="color:rgba(255,255,255,.3);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+                <input type="text" class="form-control" name="app_name" id="appNameInput"
+                       placeholder="e.g. Block Fortress, MyShop, HealthPortal…"
+                       maxlength="120"
+                       value="{{ form.app_name if form else '' }}"
+                       oninput="previewAppName(this.value)">
+                <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-top:4px">
+                    The website or app Courra-Sec will monitor. You can update this later.
+                </div>
+                <div id="app-name-preview" style="font-size:.72rem;color:#6366f1;margin-top:3px;display:none">
+                    System Status will show: <strong id="preview-app-text"></strong> (Connected)
                 </div>
             </div>
 
@@ -196,6 +211,18 @@
 </div>
 
 <script>
+    // App name preview
+    function previewAppName(val) {
+        const preview = document.getElementById('app-name-preview');
+        const text    = document.getElementById('preview-app-text');
+        if (val.trim()) {
+            preview.style.display = 'block';
+            text.textContent = val.trim();
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+
     // Slug preview from org name
     const orgInput = document.getElementById('orgName');
     const slugPreview = document.getElementById('slugPreview');

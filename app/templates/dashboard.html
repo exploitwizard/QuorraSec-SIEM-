@@ -257,6 +257,8 @@ let attackChart;
 let monitoringOn = true;
 
 /* ── helpers ─────────────────────────────────── */
+function _escH(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
 function riskClass(score) {
     if (score >= 80) return 'critical';
     if (score >= 60) return 'high';
@@ -313,9 +315,8 @@ async function loadDashboard() {
         /* Nav log counter */
         const navCtr = document.getElementById('nav-log-count');
         if (navCtr && stats.logs_today !== undefined) {
-            const pct = stats.logs_limit ? Math.round(stats.logs_today / stats.logs_limit * 100) : 0;
-            navCtr.textContent = `${stats.logs_today.toLocaleString()} / ${stats.logs_limit.toLocaleString()} logs today`;
-            navCtr.style.color = pct >= 90 ? '#fca5a5' : pct >= 70 ? '#fde68a' : 'rgba(255,255,255,.5)';
+            navCtr.textContent = `${stats.logs_today.toLocaleString()} logs today`;
+            navCtr.style.color = 'rgba(255,255,255,.5)';
         }
         monitoringOn = stats.monitoring_active;
 
@@ -331,9 +332,10 @@ async function loadDashboard() {
         }
 
         /* System status */
+        const connApp = stats.app_name || 'Your App';
         document.getElementById('systemStatus').innerHTML = `
             <div class="mb-2 small"><span class="mdot ${stats.active_monitoring?'mdot-on':'mdot-off'}"></span>Courra-Sec (${stats.active_monitoring?'Running':'Stopped'})</div>
-            <div class="mb-2 small"><span class="mdot ${stats.ws_connected?'mdot-on':'mdot-off'}"></span>Block Fortress (${stats.ws_connected?'Connected':'Disconnected'})</div>
+            <div class="mb-2 small"><span class="mdot ${stats.ws_connected?'mdot-on':'mdot-off'}"></span>${_escH(connApp)} (${stats.ws_connected?'Connected':'Disconnected'})</div>
             <div class="mb-2 small"><span class="mdot mdot-on"></span>Database (${stats.total_logs} logs)</div>
             <div class="mb-2 small"><span class="mdot ${stats.ml_available?'mdot-on':'mdot-off'}"></span>ML Pipeline (${stats.ml_available?'Active':'Not loaded'})</div>
         `;
@@ -389,23 +391,7 @@ async function loadDashboard() {
             }).join('')
             : '<p class="text-secondary small text-center py-3">No logs yet</p>';
 
-        /* Top risky entities */
-        if (ml && ml.top_risky_entities && ml.top_risky_entities.length) {
-            document.getElementById('riskyEntities').innerHTML = ml.top_risky_entities.slice(0,5).map(e => {
-                const cls = riskClass(e.avg_risk);
-                const arrow = e.trend==='rising' ? '<span class="trend-up">↑</span>' : e.trend==='falling' ? '<span class="trend-down">↓</span>' : '<span class="trend-stable">→</span>';
-                return `
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <div class="risk-ring risk-${cls}" style="width:38px;height:38px;font-size:.75rem">${Math.round(e.avg_risk)}</div>
-                    <div class="flex-fill">
-                        <div style="font-size:.78rem"><code>${e.entity_id}</code> ${arrow}</div>
-                        ${riskBar(e.avg_risk)}
-                    </div>
-                </div>`;
-            }).join('');
-        } else {
-            document.getElementById('riskyEntities').innerHTML = '<p class="text-secondary small">No data — ML models need training.</p>';
-        }
+        /* Top risky entities — loaded via dedicated endpoint below */
 
         /* Attack chains */
         if (ml && ml.top_chain_entities && ml.top_chain_entities.length) {
@@ -473,8 +459,56 @@ async function ackAlert(id) {
     loadDashboard();
 }
 
+function loadRiskyEntities() {
+    const riskColors = {critical:'#ef4444',high:'#f59e0b',medium:'#6366f1',low:'#22c55e'};
+    fetch('/api/dashboard/top-risky-entities')
+        .then(r => r.json())
+        .then(data => {
+            const entities = data.entities || [];
+            const el = document.getElementById('riskyEntities');
+            if (!el) return;
+            if (!entities.length) {
+                el.innerHTML = '<p class="text-secondary small">No events yet — send logs to see risky entities.</p>';
+                return;
+            }
+            el.innerHTML = entities.map(e => {
+                const color = riskColors[e.risk_level] || '#6366f1';
+                const flags = (e.ueba_flags || []).slice(0, 2);
+                return `
+                <div style="display:flex;align-items:center;justify-content:space-between;
+                            padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-size:.78rem;font-weight:500;color:rgba(255,255,255,.85);
+                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                            <code>${_escH(e.ip)}</code>
+                        </div>
+                        <div style="font-size:.7rem;color:rgba(255,255,255,.35);margin-top:1px">
+                            ${e.event_count} events
+                            ${e.attack_count > 0 ? ` · ${e.attack_count} attacks` : ''}
+                            ${flags.length ? ' · ' + flags.map(f=>f.replace(/_/g,' ')).join(', ') : ''}
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px">
+                        <span style="font-size:.9rem;font-weight:600;color:${color}">${e.max_risk}</span>
+                        <span style="font-size:.65rem;padding:1px 5px;border-radius:4px;
+                                     background:${color}22;color:${color};
+                                     text-transform:uppercase;letter-spacing:.04em">
+                            ${e.risk_level}
+                        </span>
+                    </div>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => {
+            const el = document.getElementById('riskyEntities');
+            if (el) el.innerHTML = '<p class="text-secondary small">Loading entity data…</p>';
+        });
+}
+
 setInterval(loadDashboard, 10000);
+setInterval(loadRiskyEntities, 30000);
 loadDashboard();
+loadRiskyEntities();
 </script>
 </body>
 </html>

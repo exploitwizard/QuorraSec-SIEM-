@@ -77,14 +77,64 @@
         <p>{{ org.name }} &nbsp;·&nbsp; {{ users|length }} / {{ org.max_users }} members</p>
     </div>
 
-    <!-- Usage -->
-    <div class="g-card" style="max-width:420px;margin-bottom:20px;">
-        <div class="sec-lbl">User Capacity</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-            <span style="font-size:.85rem;color:rgba(255,255,255,.6)">{{ users|length }} of {{ org.max_users }} seats used</span>
-            <span style="font-size:.75rem;color:rgba(255,255,255,.35)">Free plan</span>
+    <!-- Usage & Role Quotas -->
+    <div class="g-card" style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div>
+                <div class="sec-lbl">Seat Usage</div>
+                <div style="font-size:.85rem;color:rgba(255,255,255,.6);margin-top:4px"
+                     id="seat-summary">{{ users|length }} of {{ org.max_users }} seats used</div>
+            </div>
+            <span style="font-size:.75rem;padding:3px 10px;border-radius:20px;
+                         background:rgba(99,102,241,.2);color:#818cf8;font-weight:500">
+                Open Source · 20 seats
+            </span>
         </div>
-        <div class="usage-bar"><div class="usage-fill" style="width:{{ [(users|length / org.max_users * 100)|int, 100]|min }}%"></div></div>
+
+        <!-- Role quota bars -->
+        <div id="role-quota-bars"
+             style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+            <div style="font-size:.75rem;color:rgba(255,255,255,.3);grid-column:1/-1">Loading role quotas…</div>
+        </div>
+
+        <!-- Owner-only: quota controls -->
+        {% if g_role == 'owner' %}
+        <div id="quota-controls"
+             style="padding-top:14px;border-top:1px solid rgba(255,255,255,.07)">
+            <div class="sec-lbl" style="margin-bottom:10px">Role Slot Allocation</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
+                <div>
+                    <label style="font-size:.72rem;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Admin slots</label>
+                    <input type="number" id="quota-admins" min="0" max="19" value="{{ org.max_admins or 5 }}"
+                           style="width:100%;padding:6px 10px;background:rgba(255,255,255,.06);
+                                  border:1px solid rgba(255,255,255,.12);border-radius:6px;
+                                  color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:.72rem;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Analyst slots</label>
+                    <input type="number" id="quota-analysts" min="0" max="19" value="{{ org.max_analysts or 10 }}"
+                           style="width:100%;padding:6px 10px;background:rgba(255,255,255,.06);
+                                  border:1px solid rgba(255,255,255,.12);border-radius:6px;
+                                  color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:.72rem;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Read-only slots</label>
+                    <input type="number" id="quota-readonly" min="0" max="19" value="{{ org.max_readonly or 4 }}"
+                           style="width:100%;padding:6px 10px;background:rgba(255,255,255,.06);
+                                  border:1px solid rgba(255,255,255,.12);border-radius:6px;
+                                  color:#fff;font-size:13px">
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <button onclick="saveRoleQuotas()"
+                        style="padding:7px 18px;border-radius:8px;background:#6366f1;color:#fff;
+                               border:none;font-size:12px;font-weight:500;cursor:pointer">
+                    Save Allocation
+                </button>
+                <span id="quota-msg" style="font-size:12px;color:rgba(255,255,255,.5)"></span>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Team table -->
@@ -308,6 +358,78 @@ function changeRole(id, currentRole) {
     })
     .then(r => r.json())
     .then(d => { if (d.ok) location.reload(); else alert(d.error); });
+}
+
+// Role quota display
+(function loadRoleQuotas() {
+    const roleColors = {owner:'#f59e0b',admin:'#a78bfa',analyst:'#22d3ee',readonly:'#9ca3af'};
+    fetch('/api/org/role-quotas')
+        .then(r => r.json())
+        .then(data => {
+            const sumEl = document.getElementById('seat-summary');
+            if (sumEl) sumEl.textContent = `${data.total_used} of ${data.max_users} seats used`;
+
+            const barsEl = document.getElementById('role-quota-bars');
+            if (barsEl && data.quotas) {
+                barsEl.innerHTML = Object.entries(data.quotas).map(([role, q]) => {
+                    const pct   = q.max > 0 ? Math.round(q.used / q.max * 100) : 0;
+                    const color = roleColors[role] || '#6366f1';
+                    return `<div>
+                        <div style="display:flex;justify-content:space-between;
+                                    font-size:.72rem;margin-bottom:4px">
+                            <span style="color:rgba(255,255,255,.5);text-transform:capitalize">${role}</span>
+                            <span style="color:rgba(255,255,255,.7)">${q.used}/${q.max}</span>
+                        </div>
+                        <div style="height:4px;border-radius:2px;background:rgba(255,255,255,.08)">
+                            <div style="height:4px;border-radius:2px;width:${pct}%;
+                                        background:${color};transition:width .3s"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // Populate owner inputs with live values
+            if (data.quotas) {
+                const aEl = document.getElementById('quota-admins');
+                const anEl = document.getElementById('quota-analysts');
+                const rEl = document.getElementById('quota-readonly');
+                if (aEl && data.quotas.admin)    aEl.value = data.quotas.admin.max;
+                if (anEl && data.quotas.analyst)  anEl.value = data.quotas.analyst.max;
+                if (rEl && data.quotas.readonly)  rEl.value = data.quotas.readonly.max;
+            }
+        })
+        .catch(() => {});
+})();
+
+function saveRoleQuotas() {
+    const admins   = parseInt(document.getElementById('quota-admins').value   || 5);
+    const analysts = parseInt(document.getElementById('quota-analysts').value || 10);
+    const readonly = parseInt(document.getElementById('quota-readonly').value || 4);
+    const total    = admins + analysts + readonly;
+    const msg      = document.getElementById('quota-msg');
+
+    if (total > 19) {
+        msg.textContent = `Total ${total} exceeds 19 (20 seats - 1 for owner)`;
+        msg.style.color = '#ef4444';
+        return;
+    }
+
+    fetch('/api/org/role-quotas', {
+        method:  'POST',
+        headers: {'Content-Type':'application/json'},
+        body:    JSON.stringify({max_admins: admins, max_analysts: analysts, max_readonly: readonly}),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            msg.textContent = data.error;
+            msg.style.color = '#ef4444';
+        } else {
+            msg.textContent = 'Saved';
+            msg.style.color = '#22c55e';
+            setTimeout(() => { msg.textContent = ''; }, 3000);
+        }
+    });
 }
 </script>
 </body>

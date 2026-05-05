@@ -423,7 +423,86 @@ def main():
     +---------------------------------------+
     """)
 
-    # Import app after env vars are set
+    # ── Run DB migration BEFORE importing app ────────────────────────────────
+    # 'from app.main import app' triggers app/main.py at module level, which
+    # calls init_db() → Organisation.query — this crashes if new columns are
+    # missing. Running migrations here (before that import) fixes the crash.
+    try:
+        import sqlite3 as _sqlite3
+
+        _candidates = [
+            os.environ.get('DB_PATH', ''),
+            os.environ.get('DATABASE_PATH', ''),
+            'data/courra-sec.db',
+            'data/courra.db',
+            'data/quorra.db',
+            'courra.db',
+            'quorra.db',
+            'data/database.db',
+        ]
+        _db_path = next(
+            (p for p in _candidates if p and os.path.exists(p)),
+            None,
+        )
+
+        if _db_path:
+            import sys as _sys
+            _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from app.migrate import REQUIRED_COLUMNS as _REQ_COLS
+
+            _conn   = _sqlite3.connect(_db_path)
+            _cursor = _conn.cursor()
+
+            _cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+            _tables = {r[0] for r in _cursor.fetchall()}
+
+            _added = []
+            for _table, _col, _col_type, _default in _REQ_COLS:
+                if _table not in _tables:
+                    continue
+                _cursor.execute(f"PRAGMA table_info({_table})")
+                _existing = {r[1] for r in _cursor.fetchall()}
+                if _col in _existing:
+                    continue
+                try:
+                    if _default:
+                        _cursor.execute(
+                            f"ALTER TABLE {_table} "
+                            f"ADD COLUMN {_col} {_col_type} "
+                            f"DEFAULT {_default}"
+                        )
+                        _cursor.execute(
+                            f"UPDATE {_table} SET {_col} = {_default} "
+                            f"WHERE {_col} IS NULL"
+                        )
+                    else:
+                        _cursor.execute(
+                            f"ALTER TABLE {_table} "
+                            f"ADD COLUMN {_col} {_col_type}"
+                        )
+                    _added.append(f"{_table}.{_col}")
+                except _sqlite3.OperationalError:
+                    pass
+
+            _conn.commit()
+            _conn.close()
+
+            if _added:
+                print(f"  [Migration] Added {len(_added)} column(s):")
+                for _a in _added:
+                    print(f"    + {_a}")
+            else:
+                print("  [Migration] DB schema up to date")
+        else:
+            print("  [Migration] DB not found yet — will be created on first run")
+
+    except Exception as _mig_err:
+        print(f"  [Migration] Warning: {_mig_err}")
+        print("  Continuing startup...")
+
+    # ── NOW safe to import the app ────────────────────────────────────────────
     from app.main import app
     from app.config import Config
 

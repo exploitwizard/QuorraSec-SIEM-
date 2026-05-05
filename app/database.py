@@ -53,16 +53,32 @@ def init_db(app):
             Asset, ScheduledReport, OrgIPAllowlist,
         )
 
-        # Create all tables
+        # ── Step 1: Run column migrations FIRST ──────────────────────────────
+        # Must happen before ANY model query so new columns exist in the DB
+        # before SQLAlchemy tries to SELECT them.
+        try:
+            from app.migrate import run_migrations
+            run_migrations(app)
+        except Exception as _mig_err:
+            import logging as _log
+            _log.getLogger(__name__).error("Pre-migration error: %s", _mig_err)
+
+        # ── Step 2: Create any missing tables ────────────────────────────────
         db.create_all()
 
-        # ---------------------------------------------------------------------------
-        # Incremental column migrations (ALTER TABLE for existing databases)
-        # SQLite does not support IF NOT EXISTS on ADD COLUMN, so we check first.
-        # ---------------------------------------------------------------------------
+        # ── Step 3: Legacy single-column helper (kept for safety) ────────────
         _add_column_if_missing(db, 'log_entry', 'suppressed', 'BOOLEAN DEFAULT 0')
 
-        # Create default organisation and owner if none exists
+        # ── Step 4: Run data migrations ───────────────────────────────────────
+        try:
+            from app.migrate import run_data_migrations
+            run_data_migrations(app)
+        except Exception as _dmig_err:
+            import logging as _log
+            _log.getLogger(__name__).error("Data migration error: %s", _dmig_err)
+
+        # ── Step 5: Now safe to query models ─────────────────────────────────
+        # All columns exist — queries will not crash.
         import secrets as _sec
         default_org = Organisation.query.filter_by(slug='default').first()
         if not default_org:
