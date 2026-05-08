@@ -206,4 +206,8 @@ class Config:
     # -----------------------------------------------------------------------
     RESEND_API_KEY    = os.environ.get("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "noreply@yourdomain.com")
-    APP_BASE_URL      = os.environ.get("APP_BASE_URL", "http://localhost:8080")
+    APP_BASE_URL      = os.environ.get("APP_BASE_URL", "http://localhost:5001")
+
+    # When True (default), new registrations must verify their email before login.
+    # Automatically disabled when RESEND_API_KEY is not set.
+    EMAIL_VERIFICATION_REQUIRED = os.environ.get("EMAIL_VERIFICATION_REQUIRED", "true").lower() == "true"

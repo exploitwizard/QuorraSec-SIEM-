@@ -3,6 +3,7 @@ import os
 import re
 import time
 import json
+import hmac
 import secrets
 import ipaddress
 import logging
@@ -33,7 +34,10 @@ from app.models import (
     IPBlocklist, CustomRule, SoarAction, ApiKeyUsage,
 )
 from app.report_engine import run_scheduled_reports
-from app.email_service import send_invite_email
+from app.email_service import (
+    send_invite_email, send_verification_email,
+    send_password_changed_email, send_password_reset_email,
+)
 from app.metrics import (
     PROMETHEUS_AVAILABLE,
     HTTP_REQUESTS_TOTAL, HTTP_REQUEST_DURATION,
@@ -442,7 +446,10 @@ def register():
     db.session.add(org)
     db.session.flush()  # get org.id
 
-    # Check username uniqueness within org (trivial for new org)
+    # Determine email verification path upfront
+    needs_verification = Config.EMAIL_VERIFICATION_REQUIRED and bool(Config.RESEND_API_KEY)
+    verify_token = secrets.token_urlsafe(32) if needs_verification else None
+
     owner = CourraSecUser(
         organisation_id=org.id,
         username=username,
@@ -452,6 +459,8 @@ def register():
         is_admin=True,
         must_change_password=False,
         password_change_required=False,
+        email_verified=not needs_verification,
+        email_verify_token=verify_token,
     )
     owner.set_password(password)
     db.session.add(owner)
@@ -464,6 +473,14 @@ def register():
         python_dsl_sandbox=True,
     ))
     db.session.commit()
+
+    if needs_verification:
+        base_url = Config.APP_BASE_URL or request.host_url.rstrip('/')
+        send_verification_email(email, username, org_name, verify_token, base_url)
+        session['_pending_msg'] = (
+            "Registration successful! Please check your email to verify your account before logging in."
+        )
+        return redirect(url_for("login"))
 
     # Auto-login with secure session (includes CSRF token)
     create_secure_session(owner, org)
@@ -492,6 +509,9 @@ def onboarding():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # One-time info message set by register/verify flows
+    pending_info = session.pop('_pending_msg', None)
+
     if session.get("user_id"):
         return redirect(url_for("dashboard"))
 
@@ -541,6 +561,14 @@ def login():
                 return render_template("login.html",
                                        error="Your organisation has been suspended. Contact support.")
 
+            # Email verification gate
+            if Config.EMAIL_VERIFICATION_REQUIRED and user.email_verified == False:
+                return render_template(
+                    "login.html",
+                    error="Please verify your email before logging in. Check your inbox.",
+                    verify_email=user.email,
+                )
+
             if user.totp_enabled:
                 session["totp_pending_user_id"] = user.id
                 return render_template("login.html", totp_step=True)
@@ -574,7 +602,7 @@ def login():
 
         return render_template("login.html", error="Invalid credentials")
 
-    return render_template("login.html")
+    return render_template("login.html", info=pending_info)
 
 
 @app.route("/logout")
@@ -609,6 +637,127 @@ def accept_invite(token: str):
     )
 
 
+@app.route("/verify-email/<token>")
+def verify_email(token: str):
+    user = CourraSecUser.query.filter_by(email_verify_token=token).first()
+    if not user or not hmac.compare_digest(user.email_verify_token or '', token):
+        session['_pending_msg'] = "Verification link is invalid or has already been used."
+        return redirect(url_for('login'))
+
+    user.email_verified     = True
+    user.email_verify_token = None
+    db.session.commit()
+
+    session['_pending_msg'] = "Email verified! You can now log in."
+    return redirect(url_for('login'))
+
+
+@app.route("/resend-verification")
+def resend_verification():
+    email = request.args.get('email', '').strip().lower()
+    if email:
+        user = CourraSecUser.query.filter_by(email=email, is_active=True).first()
+        if user and user.email_verified == False:
+            new_token = secrets.token_urlsafe(32)
+            user.email_verify_token = new_token
+            db.session.commit()
+            base_url = Config.APP_BASE_URL or request.host_url.rstrip('/')
+            org = Organisation.query.get(user.organisation_id)
+            send_verification_email(
+                email, user.username,
+                org.name if org else 'Courra-Sec',
+                new_token, base_url,
+            )
+    return jsonify({'success': True})
+
+
+@app.route("/forgot-password")
+def forgot_password_page():
+    return render_template("forgot_password.html")
+
+
+@app.route("/api/auth/forgot-password", methods=["POST"])
+def api_forgot_password():
+    data  = request.get_json(force=True, silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+
+    if email:
+        user = CourraSecUser.query.filter_by(email=email, is_active=True).first()
+        if user:
+            reset_token = secrets.token_urlsafe(32)
+            user.password_reset_token   = reset_token
+            user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+            db.session.commit()
+            base_url = Config.APP_BASE_URL or request.host_url.rstrip('/')
+            send_password_reset_email(email, user.username, reset_token, base_url)
+        elif not Config.RESEND_API_KEY:
+            logger.warning("Password reset for %s skipped — RESEND_API_KEY not set", email)
+
+    # Always return success to prevent user enumeration
+    return jsonify({'success': True})
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token: str):
+    user = CourraSecUser.query.filter_by(password_reset_token=token).first()
+    now  = datetime.utcnow()
+
+    if (not user
+            or not user.password_reset_expires
+            or user.password_reset_expires < now
+            or not hmac.compare_digest(user.password_reset_token or '', token)):
+        session['_pending_msg'] = "Password reset link is invalid or has expired. Please request a new one."
+        return redirect(url_for('login'))
+
+    if request.method == "POST":
+        new_pw  = request.form.get('new_password', '')
+        confirm = request.form.get('confirm_password', '')
+
+        if len(new_pw) < 8:
+            return render_template("reset_password.html", token=token,
+                                   error="Password must be at least 8 characters.")
+        if new_pw != confirm:
+            return render_template("reset_password.html", token=token,
+                                   error="Passwords do not match.")
+
+        _pw_ok, _pw_err = enforce_password_policy(new_pw, user.username)
+        if not _pw_ok:
+            return render_template("reset_password.html", token=token, error=_pw_err)
+
+        client_ip = (
+            request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+            or request.remote_addr
+        )
+        ts     = datetime.utcnow()
+        _email = user.email
+        _uname = user.username
+
+        user.set_password(new_pw)
+        user.must_change_password      = False
+        user.password_change_required  = False
+        user.password_reset_token      = None
+        user.password_reset_expires    = None
+        db.session.commit()
+
+        Thread(
+            target=lambda: send_password_changed_email(_email, _uname, client_ip, ts),
+            daemon=True,
+        ).start()
+
+        try:
+            from app.audit import audit_log, Actions
+            audit_log(Actions.PASSWORD_CHANGED, org_id=user.organisation_id,
+                      user_id=user.id, username=user.username, ip=client_ip,
+                      details={'method': 'password_reset'})
+        except Exception:
+            pass
+
+        session['_pending_msg'] = "Password reset successfully. You can now log in."
+        return redirect(url_for('login'))
+
+    return render_template("reset_password.html", token=token)
+
+
 @app.route("/change-password", methods=["GET", "POST"])
 @require_auth
 def change_password():
@@ -632,10 +781,31 @@ def change_password():
                                    error="Passwords do not match.",
                                    username=user.username)
 
+        client_ip = (
+            request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+            or request.remote_addr
+        )
+        ts     = datetime.utcnow()
+        _email = user.email
+        _uname = user.username
+
         user.set_password(new_pw)
         user.must_change_password      = False
         user.password_change_required  = False
         db.session.commit()
+
+        Thread(
+            target=lambda: send_password_changed_email(_email, _uname, client_ip, ts),
+            daemon=True,
+        ).start()
+
+        try:
+            from app.audit import audit_log, Actions
+            audit_log(Actions.PASSWORD_CHANGED, org_id=user.organisation_id,
+                      user_id=user.id, username=user.username, ip=client_ip)
+        except Exception:
+            pass
+
         return redirect(url_for("dashboard"))
 
     return render_template("change_password.html",
@@ -1000,6 +1170,7 @@ def api_team_invite():
         password_change_required=True,
         invite_token=invite_token,
         invite_expires_at=invite_expiry,
+        email_verified=True,  # invite email itself serves as verification
     )
     user.set_password(temp_password)
     db.session.add(user)

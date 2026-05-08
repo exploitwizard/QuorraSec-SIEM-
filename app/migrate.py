@@ -95,8 +95,14 @@ REQUIRED_COLUMNS = [
     ("users",         "totp_enabled",       "INTEGER", "0"),
     ("users",         "last_login_at",      "DATETIME",None),
     ("users",         "last_login_ip",      "TEXT",    None),
-    ("users",         "invite_token",       "TEXT",    None),
-    ("users",         "invite_expires_at",  "DATETIME",None),
+    ("users",         "invite_token",           "TEXT",    None),
+    ("users",         "invite_expires_at",      "DATETIME",None),
+    # email verification — DEFAULT 1 so existing accounts aren't locked out
+    ("users",         "email_verified",         "INTEGER", "1"),
+    ("users",         "email_verify_token",     "TEXT",    None),
+    # password reset
+    ("users",         "password_reset_token",   "TEXT",    None),
+    ("users",         "password_reset_expires", "DATETIME",None),
 ]
 
 

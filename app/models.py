@@ -105,6 +105,14 @@ class CourraSecUser(db.Model):
     invite_token      = db.Column(db.String(64), nullable=True, unique=True)
     invite_expires_at = db.Column(db.DateTime,   nullable=True)
 
+    # Email verification (registration flow)
+    email_verified     = db.Column(db.Boolean,    default=False)
+    email_verify_token = db.Column(db.String(64), nullable=True)
+
+    # Password reset
+    password_reset_token   = db.Column(db.String(64), nullable=True)
+    password_reset_expires = db.Column(db.DateTime,   nullable=True)
+
     # Unique per organisation (not globally unique)
     __table_args__ = (
         db.UniqueConstraint('organisation_id', 'username', name='uq_org_username'),

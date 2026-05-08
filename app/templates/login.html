@@ -9,53 +9,35 @@
     <style>
         body {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        
         .login-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 15px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             padding: 2rem;
         }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .login-header h2 {
-            color: #fff;
-            font-weight: bold;
-        }
-        
-        .login-header p {
-            color: rgba(255, 255, 255, 0.7);
-        }
-        
+        .login-header { text-align: center; margin-bottom: 2rem; }
+        .login-header h2 { color: #fff; font-weight: bold; }
+        .login-header p  { color: rgba(255, 255, 255, 0.7); }
         .form-control {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: #fff;
         }
-        
         .form-control:focus {
             background: rgba(255, 255, 255, 0.15);
             border-color: #0d6efd;
             color: #fff;
             box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
-        
-        .form-label {
-            color: rgba(255, 255, 255, 0.8);
-        }
-        
+        .form-label { color: rgba(255, 255, 255, 0.8); }
         .btn-login {
             background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
             border: none;
@@ -63,103 +45,251 @@
             font-weight: bold;
             width: 100%;
         }
-        
-        .btn-login:hover {
-            background: linear-gradient(135deg, #0a58ca 0%, #084298 100%);
-        }
-        
+        .btn-login:hover { background: linear-gradient(135deg, #0a58ca 0%, #084298 100%); }
         .alert-danger {
             background: rgba(220, 53, 69, 0.2);
             border-color: rgba(220, 53, 69, 0.3);
             color: #ff6b6b;
         }
-        
-        .credential-hint {
-            background: rgba(13, 110, 253, 0.1);
-            border: 1px solid rgba(13, 110, 253, 0.3);
-            border-radius: 5px;
-            padding: 10px;
-            margin-top: 15px;
+        .alert-info-custom {
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            border-left: 3px solid #818cf8;
+            border-radius: 8px;
+            color: #c7d2fe;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1rem;
             font-size: 0.9rem;
+        }
+        .alert-success-custom {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-left: 3px solid #34d399;
+            border-radius: 8px;
+            color: #6ee7b7;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .btn-resend {
+            background: rgba(99, 102, 241, 0.25);
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            color: #c7d2fe;
+            font-size: 0.8rem;
+            padding: 4px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        .btn-resend:hover { background: rgba(99, 102, 241, 0.4); color: #e0e7ff; }
+        .forgot-link { color: rgba(255,255,255,.4); font-size: 0.83rem; }
+        .forgot-link:hover { color: rgba(255,255,255,.65); }
+        /* Modal overrides */
+        .modal-content {
+            background: #1e2535;
+            border: 1px solid rgba(255,255,255,.15);
+            color: #e2e8f0;
+        }
+        .modal-header { border-bottom: 1px solid rgba(255,255,255,.1); }
+        .modal-footer { border-top:  1px solid rgba(255,255,255,.1); }
+        .modal-title { color: #e2e8f0; }
+        .btn-close-white { filter: invert(1) brightness(2); }
+        #forgotMsg {
+            display: none;
+            background: rgba(16,185,129,.12);
+            border: 1px solid rgba(16,185,129,.3);
+            border-radius: 6px;
+            color: #6ee7b7;
+            padding: 0.7rem 1rem;
+            font-size: 0.88rem;
+            margin-top: 0.5rem;
         }
     </style>
 </head>
 <body>
     <div class="login-card">
         <div class="login-header">
-            <h2>
-                <i class="fas fa-shield-alt"></i> Courra-Sec
-            </h2>
-            <p>Security Information & Event Management</p>
+            <h2><i class="fas fa-shield-alt"></i> Courra-Sec</h2>
+            <p>Security Information &amp; Event Management</p>
         </div>
-        
-        {% if error %}
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i>
-            {{ error }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+        <!-- Success / info banner (from registration or verify flows) -->
+        {% if info %}
+        <div class="{% if 'verified' in info.lower() or 'reset' in info.lower() %}alert-success-custom{% else %}alert-info-custom{% endif %}">
+            <i class="fas fa-{% if 'verified' in info.lower() or 'reset' in info.lower() %}check-circle{% else %}envelope{% endif %} me-2"></i>{{ info }}
         </div>
         {% endif %}
-        
+
+        {% if error %}
+          {% if 'verify your email' in error.lower() %}
+          <!-- Blue info banner for unverified email -->
+          <div class="alert-info-custom">
+            <i class="fas fa-envelope me-2"></i>{{ error }}
+            {% if verify_email %}
+            <br/>
+            <button class="btn-resend" id="resendBtn" onclick="resendVerification('{{ verify_email }}')">
+                <i class="fas fa-redo me-1"></i>Resend verification email
+            </button>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if totp_step %}
+        <form method="POST" action="{{ url_for('login') }}">
+            <input type="hidden" name="totp_step" value="1">
+            <div class="mb-3">
+                <label class="form-label"><i class="fas fa-mobile-alt me-2"></i>Authenticator Code</label>
+                <input type="text" class="form-control" name="totp_code" placeholder="6-digit code"
+                       maxlength="6" pattern="\d{6}" autofocus autocomplete="one-time-code" required>
+            </div>
+            <div class="d-grid gap-2 mb-3">
+                <button type="submit" class="btn btn-login btn-primary">
+                    <i class="fas fa-key me-2"></i>Verify
+                </button>
+            </div>
+        </form>
+        {% else %}
         <form method="POST" action="{{ url_for('login') }}">
             <div class="mb-3">
                 <label for="username" class="form-label">
                     <i class="fas fa-user me-2"></i>Username
                 </label>
-                <input type="text" class="form-control" id="username" name="username" 
+                <input type="text" class="form-control" id="username" name="username"
                        placeholder="Enter username" required autofocus>
             </div>
-            
             <div class="mb-3">
                 <label for="password" class="form-label">
                     <i class="fas fa-lock me-2"></i>Password
                 </label>
-                <input type="password" class="form-control" id="password" name="password" 
-                       placeholder="Enter password" required>
+                <div style="position:relative;">
+                    <input type="password" class="form-control" id="password" name="password"
+                           placeholder="Enter password" required>
+                    <span id="pwToggle" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:rgba(255,255,255,.5);">
+                        <i class="fas fa-eye"></i>
+                    </span>
+                </div>
             </div>
-            
-            <div class="d-grid gap-2 mb-3">
+            <div class="d-grid gap-2 mb-2">
                 <button type="submit" class="btn btn-login">
                     <i class="fas fa-sign-in-alt me-2"></i>Login to Dashboard
                 </button>
             </div>
         </form>
-        
-        <div class="text-center mt-4">
-            <small class="text-muted">
-                <i class="fas fa-shield me-1"></i>
-                Secure SIEM for Block Fortress
-            </small>
+        <div class="text-center mb-2">
+            <a href="#" class="forgot-link" data-bs-toggle="modal" data-bs-target="#forgotModal">
+                Forgot password?
+            </a>
         </div>
+        {% endif %}
+
         <div class="text-center mt-3">
             <small style="color:rgba(255,255,255,.45)">
                 Don't have an account?
                 <a href="/register" style="color:#0d6efd;text-decoration:none">Register free</a>
             </small>
         </div>
+        <div class="text-center mt-3">
+            <small class="text-muted">
+                <i class="fas fa-shield me-1"></i>Secure SIEM for Block Fortress
+            </small>
+        </div>
     </div>
-    
+
+    <!-- Forgot Password Modal -->
+    <div class="modal fade" id="forgotModal" tabindex="-1" aria-labelledby="forgotModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="forgotModalLabel">
+                        <i class="fas fa-key me-2 text-primary"></i>Reset Password
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:1rem;">
+                        Enter your account email address and we'll send you a password reset link.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#cbd5e1;">Email address</label>
+                        <input type="email" class="form-control" id="forgotEmail"
+                               placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <div id="forgotMsg"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="forgotBtn" onclick="submitForgot()">
+                        <i class="fas fa-paper-plane me-1"></i>Send Reset Link
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Auto-focus on username field
-        document.getElementById('username').focus();
-        
-        // Show password toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            const passwordInput = document.getElementById('password');
-            const passwordToggle = document.createElement('span');
-            passwordToggle.innerHTML = '<i class="fas fa-eye"></i>';
-            passwordToggle.className = 'password-toggle';
-            passwordToggle.style.cssText = 'position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.5);';
-            passwordToggle.addEventListener('click', function() {
-                const type = passwordInput.type === 'password' ? 'text' : 'password';
-                passwordInput.type = type;
-                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-            });
-            
-            const passwordGroup = passwordInput.parentElement;
-            passwordGroup.style.position = 'relative';
-            passwordGroup.appendChild(passwordToggle);
+        // Password visibility toggle
+        document.getElementById('pwToggle')?.addEventListener('click', function() {
+            const inp = document.getElementById('password');
+            const icon = this.querySelector('i');
+            if (inp.type === 'password') {
+                inp.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                inp.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        });
+
+        // Resend verification email
+        async function resendVerification(email) {
+            const btn = document.getElementById('resendBtn');
+            if (!btn) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending…';
+            try {
+                const r = await fetch('/resend-verification?email=' + encodeURIComponent(email));
+                const d = await r.json();
+                btn.innerHTML = d.success
+                    ? '<i class="fas fa-check me-1"></i>Email sent!'
+                    : '<i class="fas fa-times me-1"></i>Failed — try again';
+            } catch {
+                btn.innerHTML = '<i class="fas fa-times me-1"></i>Failed — try again';
+                btn.disabled = false;
+            }
+        }
+
+        // Forgot password modal submit
+        async function submitForgot() {
+            const email = document.getElementById('forgotEmail').value.trim();
+            const btn   = document.getElementById('forgotBtn');
+            const msg   = document.getElementById('forgotMsg');
+            if (!email) { document.getElementById('forgotEmail').focus(); return; }
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending…';
+            try {
+                await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email}),
+                });
+            } catch (_) {}
+            // Always show the same message (prevent enumeration)
+            msg.style.display = 'block';
+            msg.innerHTML = '<i class="fas fa-check-circle me-2"></i>If that email exists, a reset link has been sent.';
+            btn.style.display = 'none';
+        }
+
+        // Allow Enter key in forgot modal
+        document.getElementById('forgotEmail')?.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitForgot();
         });
     </script>
 </body>
