@@ -20,12 +20,27 @@
 
         .sec-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:#6b7280; margin-bottom:12px; font-weight:600; }
 
-        pre { background:#0a0a14; border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:18px; font-size:.82rem; line-height:1.6; overflow-x:auto; color:#e2e8f0; }
+        pre { background:#0a0a14; border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:18px; font-size:.82rem; line-height:1.6; overflow-x:auto; color:#e2e8f0; margin-bottom:0; }
         code { color:#a78bfa; }
         pre code { color:#e2e8f0; }
 
-        .copy-btn { position:absolute; top:10px; right:10px; background:rgba(99,102,241,.2); border:1px solid rgba(99,102,241,.4); color:#a78bfa; border-radius:6px; padding:3px 10px; font-size:.72rem; cursor:pointer; }
-        .copy-btn:hover { background:rgba(99,102,241,.4); }
+        /* New copy button style — placed below code, never overlapping */
+        .copy-btn { 
+            background:rgba(99,102,241,.2); 
+            border:1px solid rgba(99,102,241,.4); 
+            color:#a78bfa; 
+            border-radius:6px; 
+            padding:4px 12px; 
+            font-size:.72rem; 
+            cursor:pointer; 
+            display:inline-flex; 
+            align-items:center; 
+            gap:6px;
+            transition: all .2s ease;
+            font-weight:500;
+        }
+        .copy-btn:hover { background:rgba(99,102,241,.4); border-color:#a78bfa; color:#ddd6fe; }
+        .copy-button-container { margin-top: 12px; text-align: right; }
 
         .option-table td, .option-table th { padding:8px 14px; font-size:.83rem; border-color:rgba(255,255,255,.08) !important; }
         .option-table th { color:#9ca3af; font-weight:500; }
@@ -100,8 +115,9 @@
                         <p class="text-secondary mb-2" style="font-size:.82rem">
                             Place this in the <code>&lt;head&gt;</code> of every page you want to monitor.
                         </p>
-                        <div class="position-relative">
-                            <pre><code id="snippet1">&lt;script src="http://YOUR-COURRA-SEC-HOST:5001/courra-sec-sdk.js"&gt;&lt;/script&gt;</code></pre>
+                        <!-- Code block + copy button BELOW (no overlay) -->
+                        <pre><code id="snippet1">&lt;script src="http://YOUR-COURRA-SEC-HOST:5001/courra-sec-sdk.js"&gt;&lt;/script&gt;</code></pre>
+                        <div class="copy-button-container">
                             <button class="copy-btn" onclick="copyCode('snippet1')"><i class="fas fa-copy me-1"></i>Copy</button>
                         </div>
                     </div>
@@ -114,13 +130,13 @@
                         <p class="text-secondary mb-2" style="font-size:.82rem">
                             Call <code>Courra-SecSDK.init()</code> once after the script loads.
                         </p>
-                        <div class="position-relative">
-                            <pre><code id="snippet2">Courra-SecSDK.init({
+                        <pre><code id="snippet2">Courra-SecSDK.init({
   endpoint:  "http://YOUR-COURRA-SEC-HOST:5001/ingest",
   apiKey:    "YOUR_INGEST_API_KEY",   // matches INGEST_API_KEY env var
   appId:     "my-app",
   debug:     false
 });</code></pre>
+                        <div class="copy-button-container">
                             <button class="copy-btn" onclick="copyCode('snippet2')"><i class="fas fa-copy me-1"></i>Copy</button>
                         </div>
                     </div>
@@ -130,9 +146,9 @@
                     <div class="step-num">3</div>
                     <div style="flex:1">
                         <div class="fw-semibold mb-1" style="font-size:.88rem">Optionally attach a user</div>
-                        <div class="position-relative">
-                            <pre><code id="snippet3">// Call after login
+                        <pre><code id="snippet3">// Call after login
 Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
+                        <div class="copy-button-container">
                             <button class="copy-btn" onclick="copyCode('snippet3')"><i class="fas fa-copy me-1"></i>Copy</button>
                         </div>
                     </div>
@@ -207,8 +223,8 @@ Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
                 <div class="mb-4">
                     <div class="fw-semibold mb-1" style="font-size:.88rem"><code>Courra-SecSDK.init(config)</code></div>
                     <p class="text-secondary mb-2" style="font-size:.82rem">Initialize and activate the SDK. Must be called once before any other method.</p>
-                    <div class="position-relative">
-                        <pre><code id="api1">Courra-SecSDK.init({ endpoint: "...", apiKey: "...", appId: "my-app" });</code></pre>
+                    <pre><code id="api1">Courra-SecSDK.init({ endpoint: "...", apiKey: "...", appId: "my-app" });</code></pre>
+                    <div class="copy-button-container">
                         <button class="copy-btn" onclick="copyCode('api1')"><i class="fas fa-copy me-1"></i>Copy</button>
                     </div>
                 </div>
@@ -216,8 +232,8 @@ Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
                 <div class="mb-4">
                     <div class="fw-semibold mb-1" style="font-size:.88rem"><code>Courra-SecSDK.setUser(user)</code></div>
                     <p class="text-secondary mb-2" style="font-size:.82rem">Attach user context to all subsequent events.</p>
-                    <div class="position-relative">
-                        <pre><code id="api2">Courra-SecSDK.setUser({ id: "user-42", role: "admin", name: "Alice" });</code></pre>
+                    <pre><code id="api2">Courra-SecSDK.setUser({ id: "user-42", role: "admin", name: "Alice" });</code></pre>
+                    <div class="copy-button-container">
                         <button class="copy-btn" onclick="copyCode('api2')"><i class="fas fa-copy me-1"></i>Copy</button>
                     </div>
                 </div>
@@ -225,13 +241,13 @@ Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
                 <div class="mb-4">
                     <div class="fw-semibold mb-1" style="font-size:.88rem"><code>Courra-SecSDK.captureEvent(event)</code></div>
                     <p class="text-secondary mb-2" style="font-size:.82rem">Manually report a custom security event.</p>
-                    <div class="position-relative">
-                        <pre><code id="api3">Courra-SecSDK.captureEvent({
+                    <pre><code id="api3">Courra-SecSDK.captureEvent({
   attackType: "privilege_escalation",
   endpoint:   "/admin/users",
   severity:   "high",
   payload:    "attempted role change to admin"
 });</code></pre>
+                    <div class="copy-button-container">
                         <button class="copy-btn" onclick="copyCode('api3')"><i class="fas fa-copy me-1"></i>Copy</button>
                     </div>
                 </div>
@@ -239,12 +255,12 @@ Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
                 <div class="mb-4">
                     <div class="fw-semibold mb-1" style="font-size:.88rem"><code>Courra-SecSDK.captureError(error, context)</code></div>
                     <p class="text-secondary mb-2" style="font-size:.82rem">Report a JavaScript error with optional context object.</p>
-                    <div class="position-relative">
-                        <pre><code id="api4">try {
+                    <pre><code id="api4">try {
   riskyOperation();
 } catch (err) {
   Courra-SecSDK.captureError(err, { component: "checkout", userId: "u-99" });
 }</code></pre>
+                    <div class="copy-button-container">
                         <button class="copy-btn" onclick="copyCode('api4')"><i class="fas fa-copy me-1"></i>Copy</button>
                     </div>
                 </div>
@@ -252,9 +268,9 @@ Courra-SecSDK.setUser({ id: "user-123", role: "admin" });</code></pre>
                 <div>
                     <div class="fw-semibold mb-1" style="font-size:.88rem"><code>Courra-SecSDK.flush()</code></div>
                     <p class="text-secondary mb-2" style="font-size:.82rem">Immediately send all queued events without waiting for the next interval.</p>
-                    <div class="position-relative">
-                        <pre><code id="api5">// Force-send before a critical navigation
+                    <pre><code id="api5">// Force-send before a critical navigation
 Courra-SecSDK.flush();</code></pre>
+                    <div class="copy-button-container">
                         <button class="copy-btn" onclick="copyCode('api5')"><i class="fas fa-copy me-1"></i>Copy</button>
                     </div>
                 </div>
@@ -332,8 +348,7 @@ Courra-SecSDK.flush();</code></pre>
             <div class="g-card">
                 <div class="sec-head">Event Payload Structure</div>
                 <p class="text-secondary mb-2" style="font-size:.82rem">Each event sent to <code>/ingest</code> looks like this:</p>
-                <div class="position-relative">
-                    <pre><code id="payload">{
+                <pre><code id="payload">{
   "ipAddress":  "&lt;client IP resolved server-side&gt;",
   "attackType": "xss_attempt",
   "endpoint":   "/search?q=...",
@@ -346,6 +361,7 @@ Courra-SecSDK.flush();</code></pre>
   "url":        "https://app.example.com/search",
   "userAgent":  "Mozilla/5.0 ..."
 }</code></pre>
+                <div class="copy-button-container">
                     <button class="copy-btn" onclick="copyCode('payload')"><i class="fas fa-copy me-1"></i>Copy</button>
                 </div>
             </div>
@@ -390,12 +406,22 @@ Courra-SecSDK.flush();</code></pre>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function copyCode(id) {
-    const text = document.getElementById(id).textContent;
+    const codeElement = document.getElementById(id);
+    if (!codeElement) return;
+    const text = codeElement.textContent;
     navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target.closest('.copy-btn');
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
-        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        // Find the button that triggered the copy (event handling)
+        const btn = event ? event.target.closest('.copy-btn') : null;
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
+            setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+        } else {
+            // fallback if event not propagated
+            console.log('Copied successfully');
+        }
+    }).catch(err => {
+        console.error('Copy failed: ', err);
     });
 }
 

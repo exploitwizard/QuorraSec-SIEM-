@@ -101,6 +101,10 @@ class CourraSecUser(db.Model):
     # Full name
     full_name = db.Column(db.String(120), nullable=True)
 
+    # Team invitation token (single-use, expires after 48 h)
+    invite_token      = db.Column(db.String(64), nullable=True, unique=True)
+    invite_expires_at = db.Column(db.DateTime,   nullable=True)
+
     # Unique per organisation (not globally unique)
     __table_args__ = (
         db.UniqueConstraint('organisation_id', 'username', name='uq_org_username'),

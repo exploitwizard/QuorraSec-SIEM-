@@ -95,6 +95,8 @@ REQUIRED_COLUMNS = [
     ("users",         "totp_enabled",       "INTEGER", "0"),
     ("users",         "last_login_at",      "DATETIME",None),
     ("users",         "last_login_ip",      "TEXT",    None),
+    ("users",         "invite_token",       "TEXT",    None),
+    ("users",         "invite_expires_at",  "DATETIME",None),
 ]
 
 

@@ -46,3 +46,6 @@ qrcode[pil]>=7.4.2
 
 # Optional: suppress urllib3 SSL warnings for MISP self-signed certs
 urllib3>=2.0.0
+
+# Transactional email (team invitations)
+resend>=2.0.0

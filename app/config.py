@@ -196,3 +196,14 @@ class Config:
 
     # MaxMind license key for automatic GeoLite2 download (set to enable)
     MAXMIND_LICENSE_KEY = os.environ.get("MAXMIND_LICENSE_KEY", "")
+
+    # -----------------------------------------------------------------------
+    # Email — Resend (team invitations)
+    # Set RESEND_API_KEY to enable email delivery.
+    # If unset, invitations still create the user but no email is sent.
+    # Supervisor example:
+    #   environment=RESEND_API_KEY="re_xxxxxxxx",APP_BASE_URL="https://siem.example.com",RESEND_FROM_EMAIL="noreply@yourdomain.com"
+    # -----------------------------------------------------------------------
+    RESEND_API_KEY    = os.environ.get("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "noreply@yourdomain.com")
+    APP_BASE_URL      = os.environ.get("APP_BASE_URL", "http://localhost:8080")

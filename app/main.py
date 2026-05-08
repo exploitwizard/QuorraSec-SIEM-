@@ -33,6 +33,7 @@ from app.models import (
     IPBlocklist, CustomRule, SoarAction, ApiKeyUsage,
 )
 from app.report_engine import run_scheduled_reports
+from app.email_service import send_invite_email
 from app.metrics import (
     PROMETHEUS_AVAILABLE,
     HTTP_REQUESTS_TOTAL, HTTP_REQUEST_DURATION,
@@ -582,6 +583,32 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/accept-invite/<token>")
+def accept_invite(token: str):
+    user = CourraSecUser.query.filter_by(invite_token=token).first()
+    now = datetime.utcnow()
+
+    if not user or not user.invite_expires_at or user.invite_expires_at < now:
+        return render_template(
+            "accept_invite.html",
+            error="This invitation link is invalid or has expired. Please ask your administrator to resend it.",
+        ), 400
+
+    # Consume the token so it cannot be replayed
+    user.invite_token = None
+    user.invite_expires_at = None
+    db.session.commit()
+
+    org = Organisation.query.get(user.organisation_id)
+    return render_template(
+        "accept_invite.html",
+        username=user.username,
+        full_name=user.full_name,
+        org_name=org.name if org else "",
+        role=user.role,
+    )
+
+
 @app.route("/change-password", methods=["GET", "POST"])
 @require_auth
 def change_password():
@@ -960,6 +987,9 @@ def api_team_invite():
         return jsonify({"ok": False, "error": f"Email already registered in this organisation"}), 400
 
     temp_password = password or secrets.token_urlsafe(12)
+    invite_token  = secrets.token_urlsafe(32)
+    invite_expiry = datetime.utcnow() + timedelta(hours=48)
+
     user = CourraSecUser(
         organisation_id=g.org.id,
         username=username,
@@ -968,16 +998,35 @@ def api_team_invite():
         role=role,
         must_change_password=True,
         password_change_required=True,
+        invite_token=invite_token,
+        invite_expires_at=invite_expiry,
     )
     user.set_password(temp_password)
     db.session.add(user)
     db.session.commit()
 
+    base_url     = Config.APP_BASE_URL or request.host_url.rstrip("/")
+    email_sent   = send_invite_email(
+        to_email=email,
+        to_name=full_name or username,
+        org_name=g.org.name,
+        role=role,
+        username=username,
+        temp_password=temp_password,
+        invite_token=invite_token,
+        base_url=base_url,
+    )
+
     return jsonify({
         "ok": True,
         "username": username,
         "temp_password": temp_password,
-        "message": f"User '{username}' created with role '{role}'",
+        "email_sent": email_sent,
+        "message": (
+            f"User '{username}' created with role '{role}'. Invitation email sent."
+            if email_sent else
+            f"User '{username}' created with role '{role}'. No email sent (RESEND_API_KEY not configured)."
+        ),
     })
 
 
